@@ -15,6 +15,7 @@ interface NavItem {
 const allNavItems: NavItem[] = [
   { path: "/", label: "الرئيسية", icon: Home },
   { path: "/manager-dashboard", label: "لوحة المدير", icon: LayoutDashboard, hideForRoles: ["representative"] },
+  { path: "/admin-reports", label: "التقارير", icon: ClipboardList, hideForRoles: ["representative", "branch-manager"] },
   { path: "/doctor-support", label: "دعم طبيب", icon: FileText },
   { path: "/consignment", label: "تصريف", icon: FileText },
   { path: "/extra-bonus", label: "بونص إضافي", icon: FileText },

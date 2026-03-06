@@ -17,6 +17,7 @@ import LoginPage from "./pages/LoginPage";
 import UserManagement from "./pages/UserManagement";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import RepRecordsPage from "./pages/RepRecordsPage";
+import AdminReports from "./pages/AdminReports";
 import NotFound from "./pages/NotFound";
 import { useAutoBackup } from "@/hooks/useAutoBackup";
 
@@ -82,6 +83,7 @@ const AppContent = () => {
         <Route path="/user-management" element={<UserManagement />} />
         <Route path="/manager-dashboard" element={<ManagerDashboard />} />
         <Route path="/manager-dashboard/rep/:repId" element={<RepRecordsPage />} />
+        <Route path="/admin-reports" element={<AdminReports />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
