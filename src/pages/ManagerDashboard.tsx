@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUsers, type User, getManagerSignature, saveManagerSignature, deleteManagerSignature } from "@/lib/auth";
-import { getAll, type FormRecord } from "@/lib/db";
+import { getAll } from "@/lib/db";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -43,52 +43,74 @@ const ManagerDashboard = () => {
     });
 
     reps.sort((a, b) => (oldestPending[a.id] || Infinity) - (oldestPending[b.id] || Infinity));
-
     setRepresentatives(reps);
     setPendingCounts(counts);
+  };
 
+  // Load manager signature separately so it always reflects latest saved value
+  const loadManagerSig = () => {
     if (user) {
-      setManagerSig(getManagerSignature(user.id));
+      const sig = getManagerSignature(user.id);
+      setManagerSig(sig);
     }
   };
 
-  useEffect(() => { loadData(); }, [user]);
+  useEffect(() => {
+    loadData();
+    loadManagerSig();
+  }, [user]);
 
   const handleSigFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Reset the input so the same file can be re-selected if needed
+    e.target.value = "";
     if (!file.type.startsWith("image/")) {
       toast({ title: "خطأ", description: "يرجى اختيار ملف صورة فقط", variant: "destructive" });
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (!result) return;
       const img = new window.Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
         canvas.width = img.width;
         canvas.height = img.height;
-        const ctx = canvas.getContext("2d")!;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
         ctx.drawImage(img, 0, 0);
-        setSigPreview(canvas.toDataURL("image/png"));
+        const dataUrl = canvas.toDataURL("image/png");
+        setSigPreview(dataUrl);
       };
-      img.src = reader.result as string;
+      img.onerror = () => {
+        toast({ title: "خطأ", description: "تعذّر قراءة الصورة، جرّب صيغة أخرى", variant: "destructive" });
+      };
+      img.src = result;
+    };
+    reader.onerror = () => {
+      toast({ title: "خطأ", description: "تعذّر قراءة الملف", variant: "destructive" });
     };
     reader.readAsDataURL(file);
   };
 
   const saveManagerSig = () => {
-    if (!sigPreview || !user) return;
+    if (!sigPreview || !user) {
+      toast({ title: "لا توجد صورة", description: "الرجاء اختيار صورة التوقيع أولاً", variant: "destructive" });
+      return;
+    }
     saveManagerSignature(user.id, sigPreview);
     setManagerSig(sigPreview);
     setSigPreview(null);
-    toast({ title: "تم الحفظ", description: "تم حفظ توقيع مدير الفرع" });
+    toast({ title: "✅ تم الحفظ", description: "تم حفظ توقيع مدير الفرع بنجاح" });
   };
 
   const deleteManagerSig = () => {
     if (!user) return;
     deleteManagerSignature(user.id);
     setManagerSig(null);
+    setSigPreview(null);
     toast({ title: "تم الحذف", description: "تم حذف توقيع مدير الفرع" });
   };
 
@@ -96,7 +118,7 @@ const ManagerDashboard = () => {
     <div className="container mx-auto px-4 py-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-primary">لوحة تحكم مدير الفرع</h1>
-        <Button variant="outline" onClick={() => setShowSignatureSettings(true)} className="gap-2">
+        <Button variant="outline" onClick={() => { loadManagerSig(); setShowSignatureSettings(true); }} className="gap-2">
           <PenTool className="h-4 w-4" /> إعدادات التوقيع
         </Button>
       </div>
@@ -138,9 +160,13 @@ const ManagerDashboard = () => {
       </div>
 
       {/* Manager Signature Settings */}
-      <Dialog open={showSignatureSettings} onOpenChange={setShowSignatureSettings}>
+      <Dialog open={showSignatureSettings} onOpenChange={(open) => {
+        setShowSignatureSettings(open);
+        if (!open) setSigPreview(null);
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>إعدادات توقيع مدير الفرع</DialogTitle></DialogHeader>
+
           {managerSig && (
             <div className="text-center mb-4">
               <p className="text-sm text-muted-foreground mb-2">التوقيع الحالي</p>
@@ -154,22 +180,34 @@ const ManagerDashboard = () => {
               </div>
             </div>
           )}
+
           <div
             className="bg-muted border-2 border-dashed border-primary/40 rounded-xl p-6 text-center cursor-pointer hover:border-primary transition-colors"
             onClick={() => fileRef.current?.click()}
           >
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleSigFile} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/jpg"
+              className="hidden"
+              onChange={handleSigFile}
+            />
             <Image className="h-10 w-10 mx-auto text-primary/50 mb-2" />
             <p className="text-sm text-muted-foreground">انقر لاختيار صورة التوقيع</p>
+            <p className="text-xs text-muted-foreground mt-1">(PNG / JPG / WebP)</p>
           </div>
+
           {sigPreview && (
             <div className="text-center mt-4">
               <p className="text-sm text-muted-foreground mb-2">معاينة</p>
               <div className="inline-block border rounded-lg p-4 bg-background">
                 <img src={sigPreview} alt="معاينة" className="max-h-20 max-w-full object-contain" />
               </div>
-              <div className="mt-2">
-                <Button onClick={saveManagerSig}><Check className="h-4 w-4 ml-1" /> حفظ التوقيع</Button>
+              <div className="mt-3 flex gap-2 justify-center">
+                <Button onClick={saveManagerSig} className="gap-1">
+                  <Check className="h-4 w-4" /> حفظ التوقيع
+                </Button>
+                <Button variant="outline" onClick={() => setSigPreview(null)}>إلغاء</Button>
               </div>
             </div>
           )}

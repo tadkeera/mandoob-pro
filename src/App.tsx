@@ -26,15 +26,13 @@ const AppContent = () => {
   const { user } = useAuth();
   useAutoBackup();
 
-  // If no user, show login page (BrowserRouter is already wrapping)
   if (!user) {
     return <LoginPage />;
   }
 
-  const isRep = user?.role === 'representative';
-  const isManager = user?.role === 'branch-manager';
+  const isRep = user.role === 'representative';
+  const isManager = user.role === 'branch-manager';
 
-  // Branch Manager only sees Manager Dashboard
   if (isManager) {
     return (
       <>
@@ -50,6 +48,25 @@ const AppContent = () => {
     );
   }
 
+  if (isRep) {
+    return (
+      <>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/doctor-support" element={<DoctorSupportForm />} />
+          <Route path="/consignment" element={<ConsignmentForm />} />
+          <Route path="/extra-bonus" element={<ExtraBonusForm />} />
+          <Route path="/reports" element={<ReportsIndex />} />
+          <Route path="/reports/:type" element={<Reports />} />
+          <Route path="/signature" element={<SignaturePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </>
+    );
+  }
+
+  // Admin
   return (
     <>
       <Navbar />
@@ -61,10 +78,10 @@ const AppContent = () => {
         <Route path="/reports" element={<ReportsIndex />} />
         <Route path="/reports/:type" element={<Reports />} />
         <Route path="/signature" element={<SignaturePage />} />
-        {!isRep && <Route path="/data-management" element={<DataManagement />} />}
-        {!isRep && <Route path="/user-management" element={<UserManagement />} />}
-        {!isRep && <Route path="/manager-dashboard" element={<ManagerDashboard />} />}
-        {!isRep && <Route path="/manager-dashboard/rep/:repId" element={<RepRecordsPage />} />}
+        <Route path="/data-management" element={<DataManagement />} />
+        <Route path="/user-management" element={<UserManagement />} />
+        <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+        <Route path="/manager-dashboard/rep/:repId" element={<RepRecordsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

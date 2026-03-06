@@ -10,8 +10,8 @@ const FormHeader = () => {
       borderRadius: "12px",
       padding: "8px 20px",
       marginBottom: "10px",
-      height: "2cm",
-      maxHeight: "2cm",
+      height: "2.4cm",
+      maxHeight: "2.4cm",
       overflow: "hidden",
       width: "100%",
       boxSizing: "border-box",
@@ -21,7 +21,7 @@ const FormHeader = () => {
         <strong style={{ fontSize: "22px", color: "#1a3a6b", fontWeight: "900" }}>مخازن بلقيس للأدوية</strong>
       </div>
       <div style={{ textAlign: "center", width: "25%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <img src={headerLogo} alt="Logo" style={{ maxHeight: "38px", objectFit: "contain" }} />
+        <img src={headerLogo} alt="شعار بلقيس" style={{ maxHeight: "60px", maxWidth: "80px", objectFit: "contain" }} />
         <span style={{ fontSize: "10px", color: "#333", fontWeight: "bold", marginTop: "2px" }}>www.bilquis-yo.com</span>
       </div>
       <div style={{ textAlign: "left", direction: "ltr", width: "35%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
