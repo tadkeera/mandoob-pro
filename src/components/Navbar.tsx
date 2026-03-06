@@ -29,7 +29,6 @@ const Navbar = () => {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Branch manager only sees manager dashboard and signature
   const navItems = user?.role === 'branch-manager'
     ? [
         { path: "/manager-dashboard", label: "لوحة المدير", icon: LayoutDashboard },
@@ -47,9 +46,11 @@ const Navbar = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-3 shrink-0">
-            <div className="h-10 w-10 rounded-md bg-card flex items-center justify-center">
-              <span className="text-primary font-bold text-lg">ب</span>
-            </div>
+            <img
+              src={companyLogo}
+              alt="شعار بلقيس"
+              className="h-10 w-10 rounded-md object-contain bg-card p-0.5"
+            />
             <span className="text-primary-foreground font-bold text-sm md:text-base hidden sm:block">
               مخازن بلقيس للأدوية
             </span>
@@ -74,7 +75,8 @@ const Navbar = () => {
               );
             })}
             {user && (
-              <div className="flex items-center gap-2 mr-2 border-r border-primary-foreground/20 pr-2">
+              <div className="flex items-center gap-1 mr-2 border-r border-primary-foreground/20 pr-2">
+                <NotificationBell />
                 <span className="text-primary-foreground/70 text-xs">{user.displayName}</span>
                 <button onClick={logout} className="text-primary-foreground/60 hover:text-primary-foreground p-1" title="تسجيل الخروج">
                   <LogOut className="h-4 w-4" />
@@ -83,12 +85,15 @@ const Navbar = () => {
             )}
           </div>
 
-          <button
-            className="md:hidden text-primary-foreground p-2"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+          <div className="flex items-center gap-1 md:hidden">
+            <NotificationBell />
+            <button
+              className="text-primary-foreground p-2"
+              onClick={() => setMobileOpen(!mobileOpen)}
+            >
+              {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
 
         {mobileOpen && (
