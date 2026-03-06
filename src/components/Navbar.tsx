@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { FileText, Home, ClipboardList, Database, Menu, X, PenTool, Users, LayoutDashboard, LogOut } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
+import companyLogo from "@/assets/company-logo.png";
 
 interface NavItem {
   path: string;
