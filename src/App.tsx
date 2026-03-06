@@ -17,6 +17,7 @@ import LoginPage from "./pages/LoginPage";
 import UserManagement from "./pages/UserManagement";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import RepRecordsPage from "./pages/RepRecordsPage";
+import AdminReports from "./pages/AdminReports";
 import NotFound from "./pages/NotFound";
 import { useAutoBackup } from "@/hooks/useAutoBackup";
 
