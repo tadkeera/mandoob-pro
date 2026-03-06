@@ -83,6 +83,7 @@ const AppContent = () => {
         <Route path="/user-management" element={<UserManagement />} />
         <Route path="/manager-dashboard" element={<ManagerDashboard />} />
         <Route path="/manager-dashboard/rep/:repId" element={<RepRecordsPage />} />
+        <Route path="/admin-reports" element={<AdminReports />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
