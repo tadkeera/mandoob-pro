@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import FormHeader from "@/components/FormHeader";
 import { Eye, Printer, ArrowRight, Check } from "lucide-react";
+import { addApprovalNotification } from "@/lib/notifications";
 
 const typeLabels: Record<string, string> = {
   "doctor-support": "استمارة دعم طبيب",
