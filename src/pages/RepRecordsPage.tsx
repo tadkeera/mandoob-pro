@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import FormHeader from "@/components/FormHeader";
 import { Eye, Printer, ArrowRight, Check } from "lucide-react";
+import { addApprovalNotification } from "@/lib/notifications";
 
 const typeLabels: Record<string, string> = {
   "doctor-support": "استمارة دعم طبيب",
@@ -256,7 +257,11 @@ const RepRecordsPage = () => {
     }
     updateRecordSignature(record.id, 'managerSignature', sig);
     updateRecordStatus(record.id, 'approved');
-    toast({ title: "✅ تم الاعتماد", description: `تم اعتماد النموذج وإضافة توقيع مدير الفرع بنجاح` });
+    // Send notification to the rep
+    if (record.userId) {
+      addApprovalNotification(record.userId, record.type, getRecordName(record));
+    }
+    toast({ title: "✅ تم الاعتماد", description: "تم اعتماد النموذج وإرسال إشعار للمندوب" });
     loadData();
   };
 
