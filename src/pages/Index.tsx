@@ -65,6 +65,15 @@ const Index = () => {
     });
   }
 
+  if (user && user.role === "admin") {
+    formCards.unshift({
+      title: "تقارير النماذج",
+      description: "عرض جميع نماذج المندوبين المعتمدة وغير المعتمدة مع الطباعة والحذف",
+      path: "/admin-reports",
+      icon: ClipboardList,
+    });
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)]">
       <section className="bg-primary py-16 md:py-24">
