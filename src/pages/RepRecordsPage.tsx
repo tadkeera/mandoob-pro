@@ -257,7 +257,11 @@ const RepRecordsPage = () => {
     }
     updateRecordSignature(record.id, 'managerSignature', sig);
     updateRecordStatus(record.id, 'approved');
-    toast({ title: "✅ تم الاعتماد", description: `تم اعتماد النموذج وإضافة توقيع مدير الفرع بنجاح` });
+    // Send notification to the rep
+    if (record.userId) {
+      addApprovalNotification(record.userId, record.type, getRecordName(record));
+    }
+    toast({ title: "✅ تم الاعتماد", description: "تم اعتماد النموذج وإرسال إشعار للمندوب" });
     loadData();
   };
 
