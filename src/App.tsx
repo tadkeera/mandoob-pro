@@ -42,7 +42,6 @@ const AppContent = () => {
           <Route path="/" element={<ManagerDashboard />} />
           <Route path="/manager-dashboard" element={<ManagerDashboard />} />
           <Route path="/manager-dashboard/rep/:repId" element={<RepRecordsPage />} />
-          <Route path="/signature" element={<SignaturePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </>
