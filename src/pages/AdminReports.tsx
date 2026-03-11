@@ -77,10 +77,11 @@ function SigImg({ src }: { src?: string | null }) {
 
 // ─── Form content renderer ────────────────────────────────────────────────────
 
-function RecordContent({ record }: { record: FormRecord }) {
+function RecordContent({ record, managerNameMap }: { record: FormRecord; managerNameMap?: Record<string, string> }) {
   const d = record.data;
-  const repSig = record.repSignature;
-  const mgrSig = record.managerSignature;
+  // Get manager name from the record's approvedBy field or from the managerNameMap
+  const managerName = (record as any).approvedByName || 
+    (managerNameMap && record.userId ? managerNameMap[record.userId] : null);
 
   if (record.type === "doctor-support") {
     const pharmacies = (d.pharmacies as any[]) || [];
@@ -152,12 +153,13 @@ function RecordContent({ record }: { record: FormRecord }) {
           وعليه نلتزم بوفاء المذكور بكتابة الأصناف، وفي حالة عدم الوفاء فنحن نتحمل المسؤولية كاملة.
         </p>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "13px", alignItems: "center", marginTop: "10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مقدم الطلب: <span className="out-text">{d.rep as string}</span>
-            <SigImg src={repSig} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مدير الفرع: <SigImg src={mgrSig} />
+          <div>مقدم الطلب: <span className="out-text">{d.rep as string}</span></div>
+          <div>
+            مدير الفرع:{" "}
+            {managerName
+              ? <span className="out-text" style={{ fontWeight: "bold" }}>{managerName}</span>
+              : <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "110px" }} />
+            }
           </div>
         </div>
         <div style={{ fontSize: "12px", marginTop: "8px" }}>
@@ -225,14 +227,10 @@ function RecordContent({ record }: { record: FormRecord }) {
         </div>
         <p>وعليه .... التزم بتصريف البضاعة المباعة وعدم إرجاعها ونتحمل المسئولية كامله .</p>
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "30px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <span>المندوب</span>
-            <span className="out-text">{d.rep as string}</span>
-            <SigImg src={repSig} />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <span>مدير الفرع</span>
-            <SigImg src={mgrSig} />
+          <div>المندوب<br /><span className="out-text">{d.rep as string}</span></div>
+          <div>
+            مدير الفرع<br />
+            {managerName ? <span className="out-text" style={{ fontWeight: "bold" }}>{managerName}</span> : <span>...................</span>}
           </div>
           <div>المكتب العلمي<br />...................</div>
           <div>مدير القطاع<br />...................</div>
@@ -275,14 +273,10 @@ function RecordContent({ record }: { record: FormRecord }) {
           </div>
         ))}
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <span>المندوب</span>
-            <span className="out-text">{d.rep as string}</span>
-            <SigImg src={repSig} />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <span>مدير الفرع</span>
-            <SigImg src={mgrSig} />
+          <div>المندوب<br /><span className="out-text">{d.rep as string}</span></div>
+          <div>
+            مدير الفرع<br />
+            {managerName ? <span className="out-text" style={{ fontWeight: "bold" }}>{managerName}</span> : <span>...................</span>}
           </div>
           <div>المكتب العلمي<br />...................</div>
           <div>مدير القطاع<br />...................</div>
