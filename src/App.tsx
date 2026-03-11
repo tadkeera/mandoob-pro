@@ -12,7 +12,7 @@ import ExtraBonusForm from "./pages/ExtraBonusForm";
 import Reports from "./pages/Reports";
 import ReportsIndex from "./pages/ReportsIndex";
 import DataManagement from "./pages/DataManagement";
-import SignaturePage from "./pages/SignaturePage";
+
 import LoginPage from "./pages/LoginPage";
 import UserManagement from "./pages/UserManagement";
 import ManagerDashboard from "./pages/ManagerDashboard";
@@ -42,7 +42,6 @@ const AppContent = () => {
           <Route path="/" element={<ManagerDashboard />} />
           <Route path="/manager-dashboard" element={<ManagerDashboard />} />
           <Route path="/manager-dashboard/rep/:repId" element={<RepRecordsPage />} />
-          <Route path="/signature" element={<SignaturePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </>
@@ -60,7 +59,6 @@ const AppContent = () => {
           <Route path="/extra-bonus" element={<ExtraBonusForm />} />
           <Route path="/reports" element={<ReportsIndex />} />
           <Route path="/reports/:type" element={<Reports />} />
-          <Route path="/signature" element={<SignaturePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </>
@@ -78,7 +76,6 @@ const AppContent = () => {
         <Route path="/extra-bonus" element={<ExtraBonusForm />} />
         <Route path="/reports" element={<ReportsIndex />} />
         <Route path="/reports/:type" element={<Reports />} />
-        <Route path="/signature" element={<SignaturePage />} />
         <Route path="/data-management" element={<DataManagement />} />
         <Route path="/user-management" element={<UserManagement />} />
         <Route path="/manager-dashboard" element={<ManagerDashboard />} />

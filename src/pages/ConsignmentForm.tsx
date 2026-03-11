@@ -1,13 +1,13 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import FormHeader from "@/components/FormHeader";
 import { save } from "@/lib/db";
-import { getSignature } from "@/lib/signature";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Save, RotateCcw, Plus, Trash2, UserPlus } from "lucide-react";
+import { Save, RotateCcw, Plus, Trash2, UserPlus, Eye } from "lucide-react";
 
 interface ConsignmentItem { name: string; qty: string; date: string; }
 interface ClientGroup { clientName: string; items: ConsignmentItem[]; }
@@ -18,7 +18,7 @@ const ConsignmentForm = () => {
   const [formData, setFormData] = useState({ date: "", branch: "", rep: "" });
   const [clients, setClients] = useState<ClientGroup[]>([{ clientName: "", items: [] }]);
   const [newItems, setNewItems] = useState<Record<number, ConsignmentItem>>({});
-  const printRef = useRef<HTMLDivElement>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const update = (field: string, value: string) => setFormData(prev => ({ ...prev, [field]: value }));
   const updateClientName = (idx: number, name: string) => setClients(prev => prev.map((c, i) => i === idx ? { ...c, clientName: name } : c));
@@ -42,25 +42,11 @@ const ConsignmentForm = () => {
     toast({ title: "تم الحفظ", description: "تم حفظ نموذج التصريف بنجاح" });
   };
 
-  // FIX: حفظ مع التوقيع
-  const handleSaveWithSignature = () => {
-    const sig = getSignature(user?.id);
-    if (!sig) {
-      toast({ title: "لا يوجد توقيع", description: "يرجى رفع توقيع أولاً من صفحة إدارة التوقيع", variant: "destructive" });
-      return;
-    }
-    const allClients = clients.map(c => c.clientName).filter(Boolean).join("، ");
-    save({ type: "consignment", data: { ...formData, clients, clientName: allClients }, userId: user?.id, repSignature: sig });
-    toast({ title: "تم الحفظ مع التوقيع ✓", description: "تم حفظ نموذج التصريف مع التوقيع بنجاح وأُضيف للسجلات" });
-  };
-
   const handleReset = () => { setFormData({ date: "", branch: "", rep: "" }); setClients([{ clientName: "", items: [] }]); };
-
-  const repSignature = getSignature(user?.id);
 
   return (
     <div className="container mx-auto px-4 py-6 animate-fade-in">
-      <div className="bg-card rounded-lg shadow-md p-4 md:p-6 mb-6 no-print">
+      <div className="bg-card rounded-lg shadow-md p-4 md:p-6 mb-6">
         <h2 className="text-xl font-bold text-primary mb-4">إدخال بيانات: نموذج تصريف</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div><Label>التاريخ</Label><Input type="date" value={formData.date} onChange={e => update("date", e.target.value)} /></div>
@@ -97,51 +83,51 @@ const ConsignmentForm = () => {
         <Button variant="outline" onClick={addClient} className="gap-2 mb-4"><UserPlus className="h-4 w-4" />إضافة عميل آخر</Button>
         <div className="flex flex-wrap gap-3 mt-4">
           <Button onClick={handleSave} className="gap-2"><Save className="h-4 w-4" />حفظ</Button>
-          <Button onClick={handleSaveWithSignature} variant="secondary" className="gap-2"><Save className="h-4 w-4" />حفظ مع التوقيع</Button>
+          <Button variant="outline" onClick={() => setShowPreview(true)} className="gap-2"><Eye className="h-4 w-4" />معاينة النموذج</Button>
           <Button variant="outline" onClick={handleReset} className="gap-2"><RotateCcw className="h-4 w-4" />مسح</Button>
         </div>
-        {!repSignature && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            ملاحظة: لاستخدام "حفظ مع التوقيع"، يرجى أولاً رفع توقيعك من صفحة <a href="/signature" className="text-primary underline">إدارة التوقيع</a>
-          </p>
-        )}
       </div>
 
-      <div id="consignment-print" ref={printRef} className="print-area print-page">
-        <FormHeader />
-        <div style={{ textAlign: "center", fontWeight: "bold", marginBottom: "10px" }}>بسم الله الرحمن الرحيم</div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", fontWeight: "bold" }}>
-          <div>التاريخ: <span className="out-text">{formData.date}</span></div>
-          <div>الفرع: <span className="out-text">{formData.branch}</span></div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginBottom: "15px" }}>
-          <div style={{ display: "flex", flexDirection: "column" }}><span>الاخ / مدير القطاع</span><span>الاخ / مدير المكتب العلمي</span></div>
-          <div style={{ alignSelf: "flex-end" }}>المحترمين</div>
-        </div>
-        <p>بعد التحية ،،،،،،،،،،</p>
-        <div style={{ textAlign: "center", fontWeight: "bold", fontSize: "16px", margin: "15px 0", textDecoration: "underline" }}>الموضوع: إنزال بضاعة تحت التصريف</div>
-        <p>اشارة الى الموضوع اعلاه ، نرجو منكم الموافقة على أنزال الاصناف التالية تحت التصريف وعلى مسئوليتي متابعتها أولاً بأول وعدم وجود أي منتهيات والاصناف هي :</p>
-        {clients.map((client, cIdx) => (
-          <div key={cIdx} style={{ marginBottom: "10px" }}>
-            <div style={{ fontWeight: "bold", marginBottom: "5px" }}>العميل: <span className="out-text">{client.clientName}</span></div>
-            <table className="compact-table">
-              <thead><tr><th>اسم الصنف</th><th>الكمية</th><th>التاريخ</th></tr></thead>
-              <tbody>
-                {client.items.length === 0 ? <tr><td colSpan={3} style={{ color: "#777" }}>لم يتم إضافة أصناف</td></tr> : client.items.map((item, i) => <tr key={i}><td>{item.name}</td><td>{item.qty}</td><td>{item.date}</td></tr>)}
-              </tbody>
-            </table>
+      {/* Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>معاينة: نموذج تصريف</DialogTitle>
+          </DialogHeader>
+          <div id="consignment-print" className="print-page" style={{ border: "2px solid #000", borderRadius: "5px", padding: "16px" }}>
+            <FormHeader />
+            <div style={{ textAlign: "center", fontWeight: "bold", marginBottom: "10px" }}>بسم الله الرحمن الرحيم</div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", fontWeight: "bold" }}>
+              <div>التاريخ: <span className="out-text">{formData.date}</span></div>
+              <div>الفرع: <span className="out-text">{formData.branch}</span></div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginBottom: "15px" }}>
+              <div style={{ display: "flex", flexDirection: "column" }}><span>الاخ / مدير القطاع</span><span>الاخ / مدير المكتب العلمي</span></div>
+              <div style={{ alignSelf: "flex-end" }}>المحترمين</div>
+            </div>
+            <p>بعد التحية ،،،،،،،،،،</p>
+            <div style={{ textAlign: "center", fontWeight: "bold", fontSize: "16px", margin: "15px 0", textDecoration: "underline" }}>الموضوع: إنزال بضاعة تحت التصريف</div>
+            <p>اشارة الى الموضوع اعلاه ، نرجو منكم الموافقة على أنزال الاصناف التالية تحت التصريف وعلى مسئوليتي متابعتها أولاً بأول وعدم وجود أي منتهيات والاصناف هي :</p>
+            {clients.map((client, cIdx) => (
+              <div key={cIdx} style={{ marginBottom: "10px" }}>
+                <div style={{ fontWeight: "bold", marginBottom: "5px" }}>العميل: <span className="out-text">{client.clientName}</span></div>
+                <table className="compact-table">
+                  <thead><tr><th>اسم الصنف</th><th>الكمية</th><th>التاريخ</th></tr></thead>
+                  <tbody>
+                    {client.items.length === 0 ? <tr><td colSpan={3} style={{ color: "#777" }}>لم يتم إضافة أصناف</td></tr> : client.items.map((item, i) => <tr key={i}><td>{item.name}</td><td>{item.qty}</td><td>{item.date}</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
+              <div>المندوب<br /><span className="out-text">{formData.rep}</span></div>
+              <div>مدير الفرع<br /><br />...................</div>
+              <div>المكتب العلمي<br /><br />...................</div>
+              <div>مدير القطاع<br /><br />...................</div>
+            </div>
           </div>
-        ))}
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            المندوب<br /><span className="out-text">{formData.rep}</span>
-            {repSignature && <img src={repSignature} alt="التوقيع" style={{ width: "90px", height: "45px", objectFit: "contain" }} />}
-          </div>
-          <div>مدير الفرع<br /><br />...................</div>
-          <div>المكتب العلمي<br /><br />...................</div>
-          <div>مدير القطاع<br /><br />...................</div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

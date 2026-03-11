@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, ClipboardList, Database, PenTool, Users, LayoutDashboard } from "lucide-react";
+import { FileText, ClipboardList, Database, Users, LayoutDashboard } from "lucide-react";
+import companyLogo from "@/assets/company-logo.png";
 
 const Index = () => {
   const { user } = useAuth();
@@ -30,12 +31,6 @@ const Index = () => {
       path: "/reports",
       icon: ClipboardList,
     },
-    {
-      title: "إدارة التوقيع",
-      description: "رفع وحفظ صورة التوقيع لإضافتها للنماذج",
-      path: "/signature",
-      icon: PenTool,
-    },
   ];
 
   // Add role-specific cards
@@ -56,15 +51,6 @@ const Index = () => {
     );
   }
 
-  if (user && (user.role === "branch-manager" || user.role === "admin")) {
-    formCards.unshift({
-      title: "لوحة تحكم مدير الفرع",
-      description: "عرض ومتابعة نماذج المندوبين والاعتماد",
-      path: "/manager-dashboard",
-      icon: LayoutDashboard,
-    });
-  }
-
   if (user && user.role === "admin") {
     formCards.unshift({
       title: "تقارير النماذج",
@@ -74,12 +60,21 @@ const Index = () => {
     });
   }
 
+  if (user && user.role === "branch-manager") {
+    formCards.unshift({
+      title: "لوحة تحكم مدير الفرع",
+      description: "عرض ومتابعة نماذج المندوبين والاعتماد",
+      path: "/manager-dashboard",
+      icon: LayoutDashboard,
+    });
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)]">
       <section className="bg-primary py-16 md:py-24">
         <div className="container mx-auto px-4 text-center">
-          <div className="h-24 w-24 mx-auto mb-6 rounded-xl bg-card flex items-center justify-center shadow-lg">
-            <span className="text-primary font-bold text-3xl">ب</span>
+          <div className="h-24 w-24 mx-auto mb-6 rounded-xl bg-card flex items-center justify-center shadow-lg overflow-hidden">
+            <img src={companyLogo} alt="شعار بلقيس" className="h-full w-full object-contain p-1" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-primary-foreground mb-3">
             نماذج شركة مخازن بلقيس للأدوية

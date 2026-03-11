@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getUsers, type User, getManagerSignature, saveManagerSignature, deleteManagerSignature } from "@/lib/auth";
+import { getUsers, type User, saveManagerName, getManagerName } from "@/lib/auth";
 import { getAll } from "@/lib/db";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PenTool, Bell, Trash2, Check, Upload } from "lucide-react";
+import { Bell, Check, Save, User as UserIcon } from "lucide-react";
 
 const ManagerDashboard = () => {
   const { user } = useAuth();
@@ -14,9 +15,8 @@ const ManagerDashboard = () => {
   const navigate = useNavigate();
   const [representatives, setRepresentatives] = useState<User[]>([]);
   const [pendingCounts, setPendingCounts] = useState<Record<string, number>>({});
-  const [showSignatureSettings, setShowSignatureSettings] = useState(false);
-  const [managerSig, setManagerSig] = useState<string | null>(null);
-  const [sigPreview, setSigPreview] = useState<string | null>(null);
+  const [managerName, setManagerName] = useState<string>("");
+  const [savedManagerName, setSavedManagerName] = useState<string>("");
 
   const loadData = () => {
     const users = getUsers();
@@ -45,94 +45,65 @@ const ManagerDashboard = () => {
     setPendingCounts(counts);
   };
 
-  const loadManagerSig = () => {
+  const loadManagerName = () => {
     if (user) {
-      const sig = getManagerSignature(user.id);
-      setManagerSig(sig);
+      const name = getManagerName(user.id) || user.displayName || "";
+      setSavedManagerName(name);
+      setManagerName(name);
     }
   };
 
   useEffect(() => {
     loadData();
-    loadManagerSig();
+    loadManagerName();
   }, [user]);
 
-  // Direct file reading — no canvas needed
-  const handleSigFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast({ title: "خطأ", description: "يرجى اختيار ملف صورة فقط", variant: "destructive" });
-      e.target.value = "";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result as string;
-      if (result) {
-        setSigPreview(result);
-      }
-    };
-    reader.onerror = () => {
-      toast({ title: "خطأ", description: "تعذّر قراءة الملف", variant: "destructive" });
-    };
-    reader.readAsDataURL(file);
-    // Reset input
-    e.target.value = "";
-  };
-
-  const handleSaveSignature = () => {
-    if (!user) {
-      toast({ title: "خطأ", description: "يرجى تسجيل الدخول أولاً", variant: "destructive" });
-      return;
-    }
-    if (!sigPreview) {
-      toast({ title: "لا توجد صورة", description: "الرجاء اختيار صورة التوقيع أولاً", variant: "destructive" });
-      return;
-    }
-    try {
-      saveManagerSignature(user.id, sigPreview);
-      const saved = getManagerSignature(user.id);
-      if (saved) {
-        setManagerSig(saved);
-        setSigPreview(null);
-        toast({ title: "✅ تم الحفظ", description: "تم حفظ توقيع مدير الفرع بنجاح" });
-      } else {
-        toast({ title: "خطأ", description: "فشل حفظ التوقيع، يرجى المحاولة مجدداً", variant: "destructive" });
-      }
-    } catch (err) {
-      toast({ title: "خطأ", description: "حدث خطأ أثناء الحفظ: " + String(err), variant: "destructive" });
-    }
-  };
-
-  const handleDeleteSignature = () => {
+  const handleSaveName = () => {
     if (!user) return;
-    deleteManagerSignature(user.id);
-    setManagerSig(null);
-    setSigPreview(null);
-    toast({ title: "تم الحذف", description: "تم حذف توقيع مدير الفرع" });
+    if (!managerName.trim()) {
+      toast({ title: "خطأ", description: "يرجى إدخال اسم مدير الفرع", variant: "destructive" });
+      return;
+    }
+    saveManagerName(user.id, managerName.trim());
+    setSavedManagerName(managerName.trim());
+    toast({ title: "✅ تم الحفظ", description: `تم حفظ اسم مدير الفرع: ${managerName.trim()}` });
   };
 
   return (
     <div className="container mx-auto px-4 py-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-primary">لوحة تحكم مدير الفرع</h1>
-        <Button
-          variant="outline"
-          onClick={() => { loadManagerSig(); setShowSignatureSettings(true); }}
-          className="gap-2"
-        >
-          <PenTool className="h-4 w-4" /> إعدادات التوقيع
-        </Button>
       </div>
 
-      {!managerSig && (
-        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
-          ⚠️ لم يتم إعداد توقيع مدير الفرع بعد. يرجى إضافة توقيعك من "إعدادات التوقيع" لتتمكن من اعتماد النماذج.
+      {/* Manager Name Setting */}
+      <div className="bg-card border rounded-xl p-5 mb-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <UserIcon className="h-5 w-5 text-primary" />
+          <h2 className="text-base font-bold text-card-foreground">اسم مدير الفرع للاعتماد</h2>
         </div>
-      )}
+        {savedManagerName && (
+          <div className="mb-3 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <Check className="h-4 w-4" />
+            الاسم المحفوظ: <strong>{savedManagerName}</strong>
+          </div>
+        )}
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <Label className="text-sm mb-1 block">اسم مدير الفرع</Label>
+            <Input
+              value={managerName}
+              onChange={e => setManagerName(e.target.value)}
+              placeholder="أدخل اسم مدير الفرع..."
+            />
+          </div>
+          <Button onClick={handleSaveName} className="gap-2 shrink-0">
+            <Save className="h-4 w-4" /> حفظ الاسم
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          سيظهر هذا الاسم بجانب "مدير الفرع" في النماذج المعتمدة عند الطباعة.
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {representatives.map(rep => (
@@ -163,81 +134,6 @@ const ManagerDashboard = () => {
           </div>
         )}
       </div>
-
-      {/* Manager Signature Settings Dialog */}
-      <Dialog
-        open={showSignatureSettings}
-        onOpenChange={(open) => {
-          setShowSignatureSettings(open);
-          if (!open) setSigPreview(null);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>إعدادات توقيع مدير الفرع</DialogTitle>
-          </DialogHeader>
-
-          {/* Current Signature */}
-          {managerSig && (
-            <div className="text-center mb-4 p-4 border rounded-lg bg-muted/30">
-              <p className="text-sm font-medium text-muted-foreground mb-2">التوقيع الحالي المحفوظ</p>
-              <img
-                src={managerSig}
-                alt="توقيع المدير"
-                className="max-h-24 max-w-full object-contain mx-auto border rounded bg-background p-2"
-              />
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDeleteSignature}
-                className="mt-3 gap-1"
-              >
-                <Trash2 className="h-4 w-4" /> حذف التوقيع
-              </Button>
-            </div>
-          )}
-
-          {/* Upload Area */}
-          <div className="space-y-3">
-            <label className="block">
-              <div className="bg-muted border-2 border-dashed border-primary/40 rounded-xl p-6 text-center cursor-pointer hover:border-primary hover:bg-muted/80 transition-colors">
-                <Upload className="h-10 w-10 mx-auto text-primary/50 mb-2" />
-                <p className="text-sm font-medium text-foreground">انقر لاختيار صورة التوقيع</p>
-                <p className="text-xs text-muted-foreground mt-1">PNG / JPG / WebP</p>
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleSigFile}
-              />
-            </label>
-          </div>
-
-          {/* Preview */}
-          {sigPreview && (
-            <div className="mt-4 p-4 border rounded-lg bg-muted/30">
-              <p className="text-sm font-medium text-muted-foreground mb-2 text-center">معاينة الصورة المختارة</p>
-              <img
-                src={sigPreview}
-                alt="معاينة التوقيع"
-                className="max-h-24 max-w-full object-contain mx-auto border rounded bg-background p-2"
-              />
-              <div className="mt-4 flex gap-2 justify-center">
-                <Button onClick={handleSaveSignature} className="gap-1 bg-green-600 hover:bg-green-700 text-white">
-                  <Check className="h-4 w-4" /> حفظ التوقيع
-                </Button>
-                <Button variant="outline" onClick={() => setSigPreview(null)}>إلغاء</Button>
-              </div>
-            </div>
-          )}
-
-          {/* Debug info */}
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            المستخدم: {user?.displayName || "غير محدد"} | ID: {user?.id?.slice(0, 8)}...
-          </p>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

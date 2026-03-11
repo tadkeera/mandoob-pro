@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getUsers, type User } from "@/lib/auth";
+import { getUsers, type User, getManagerName } from "@/lib/auth";
 import { getAll, deleteRecord, type FormRecord } from "@/lib/db";
 import { printElement } from "@/lib/pdfUtils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -62,25 +62,13 @@ function getRecordName(record: FormRecord): string {
   return "";
 }
 
-// ─── Signature helper ─────────────────────────────────────────────────────────
-
-function SigImg({ src }: { src?: string | null }) {
-  if (!src) return <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "110px" }} />;
-  return (
-    <img
-      src={src}
-      alt="التوقيع"
-      style={{ width: "100px", height: "48px", objectFit: "contain", display: "inline-block", verticalAlign: "middle" }}
-    />
-  );
-}
-
 // ─── Form content renderer ────────────────────────────────────────────────────
 
-function RecordContent({ record }: { record: FormRecord }) {
+function RecordContent({ record, managerNameMap }: { record: FormRecord; managerNameMap?: Record<string, string> }) {
   const d = record.data;
-  const repSig = record.repSignature;
-  const mgrSig = record.managerSignature;
+  // Get manager name from the record's approvedBy field or from the managerNameMap
+  const managerName = (record as any).approvedByName || 
+    (managerNameMap && record.userId ? managerNameMap[record.userId] : null);
 
   if (record.type === "doctor-support") {
     const pharmacies = (d.pharmacies as any[]) || [];
@@ -152,12 +140,13 @@ function RecordContent({ record }: { record: FormRecord }) {
           وعليه نلتزم بوفاء المذكور بكتابة الأصناف، وفي حالة عدم الوفاء فنحن نتحمل المسؤولية كاملة.
         </p>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "13px", alignItems: "center", marginTop: "10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مقدم الطلب: <span className="out-text">{d.rep as string}</span>
-            <SigImg src={repSig} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مدير الفرع: <SigImg src={mgrSig} />
+          <div>مقدم الطلب: <span className="out-text">{d.rep as string}</span></div>
+          <div>
+            مدير الفرع:{" "}
+            {managerName
+              ? <span className="out-text" style={{ fontWeight: "bold" }}>{managerName}</span>
+              : <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "110px" }} />
+            }
           </div>
         </div>
         <div style={{ fontSize: "12px", marginTop: "8px" }}>
@@ -225,14 +214,10 @@ function RecordContent({ record }: { record: FormRecord }) {
         </div>
         <p>وعليه .... التزم بتصريف البضاعة المباعة وعدم إرجاعها ونتحمل المسئولية كامله .</p>
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "30px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <span>المندوب</span>
-            <span className="out-text">{d.rep as string}</span>
-            <SigImg src={repSig} />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <span>مدير الفرع</span>
-            <SigImg src={mgrSig} />
+          <div>المندوب<br /><span className="out-text">{d.rep as string}</span></div>
+          <div>
+            مدير الفرع<br />
+            {managerName ? <span className="out-text" style={{ fontWeight: "bold" }}>{managerName}</span> : <span>...................</span>}
           </div>
           <div>المكتب العلمي<br />...................</div>
           <div>مدير القطاع<br />...................</div>
@@ -275,14 +260,10 @@ function RecordContent({ record }: { record: FormRecord }) {
           </div>
         ))}
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <span>المندوب</span>
-            <span className="out-text">{d.rep as string}</span>
-            <SigImg src={repSig} />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <span>مدير الفرع</span>
-            <SigImg src={mgrSig} />
+          <div>المندوب<br /><span className="out-text">{d.rep as string}</span></div>
+          <div>
+            مدير الفرع<br />
+            {managerName ? <span className="out-text" style={{ fontWeight: "bold" }}>{managerName}</span> : <span>...................</span>}
           </div>
           <div>المكتب العلمي<br />...................</div>
           <div>مدير القطاع<br />...................</div>
@@ -455,6 +436,7 @@ const AdminReports = () => {
   const [viewRecord, setViewRecord] = useState<FormRecord | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [globalFilter, setGlobalFilter] = useState<FilterStatus>("all");
+  const [managerNameMap, setManagerNameMap] = useState<Record<string, string>>({});
 
   // Redirect if not admin
   useEffect(() => {
@@ -475,6 +457,16 @@ const AdminReports = () => {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     });
+
+    // Build manager names per rep (based on branch-manager users)
+    const managerUsers = users.filter(u => u.role === "branch-manager");
+    const nameMap: Record<string, string> = {};
+    managerUsers.forEach(mgr => {
+      const name = getManagerName(mgr.id) || mgr.displayName;
+      // Map to all reps (simplified - one manager name for all)
+      repUsers.forEach(rep => { nameMap[rep.id] = name; });
+    });
+    setManagerNameMap(nameMap);
     setReps(repUsers);
     setRecordsMap(map);
   };
@@ -580,7 +572,7 @@ const AdminReports = () => {
               style={{ border: "2px solid #000", borderRadius: "5px", padding: "16px" }}
             >
               <FormHeader />
-              <RecordContent record={viewRecord} />
+              <RecordContent record={viewRecord} managerNameMap={managerNameMap} />
             </div>
           )}
           <div className="flex justify-end gap-2 mt-4 no-print">

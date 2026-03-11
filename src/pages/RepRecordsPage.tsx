@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getUsers, type User, getManagerSignature } from "@/lib/auth";
-import { getAll, updateRecordSignature, updateRecordStatus, type FormRecord } from "@/lib/db";
+import { getUsers, type User, getManagerName } from "@/lib/auth";
+import { getAll, updateRecordStatus, type FormRecord } from "@/lib/db";
 import { printElement } from "@/lib/pdfUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -25,17 +25,8 @@ function getRecordName(record: FormRecord): string {
   return "";
 }
 
-function SignatureImg({ src, width = 90, height = 45 }: { src?: string | null; width?: number; height?: number }) {
-  if (!src) return null;
-  return <img src={src} alt="التوقيع" style={{ width: `${width}px`, height: `${height}px`, objectFit: "contain", display: "inline-block", verticalAlign: "middle" }} />;
-}
-
-function RecordContent({ record, showRepSig, showManagerSig, managerSigUrl }: {
-  record: FormRecord; showRepSig: boolean; showManagerSig: boolean; managerSigUrl?: string
-}) {
+function RecordContent({ record, managerName }: { record: FormRecord; managerName?: string }) {
   const d = record.data;
-  const repSig = record.repSignature;
-  const mgrSig = managerSigUrl || record.managerSignature;
 
   if (record.type === "doctor-support") {
     const pharmacies = (d.pharmacies as any[]) || [];
@@ -102,16 +93,15 @@ function RecordContent({ record, showRepSig, showManagerSig, managerSigUrl }: {
           وعليه نلتزم بوفاء المذكور بكتابة الأصناف، وفي حالة عدم الوفاء فنحن نتحمل المسؤولية كاملة.
         </p>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "13px", alignItems: "center", marginTop: "10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مقدم الطلب: <span className="out-text">{d.rep as string}</span>
-            {showRepSig && <SignatureImg src={repSig} />}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مدير الفرع:
-            {showManagerSig && mgrSig ? <SignatureImg src={mgrSig} /> : <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "120px" }}></span>}
+          <div>مقدم الطلب: <span className="out-text">{d.rep as string}</span></div>
+          <div>
+            مدير الفرع:{" "}
+            {managerName
+              ? <span className="out-text" style={{ fontWeight: "bold" }}>{managerName}</span>
+              : <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "120px" }}></span>
+            }
           </div>
         </div>
-        {/* Bottom section boxes */}
         <div style={{ fontSize: "12px", marginTop: "8px" }}>
           <div className="box">
             <div className="flex-row" style={{ fontWeight: "bold" }}><span>الأخ / مدير القطاع</span><span className="dotted-line"></span><span>المحترم،</span></div>
@@ -172,11 +162,11 @@ function RecordContent({ record, showRepSig, showManagerSig, managerSigUrl }: {
         </div>
         <p>وعليه .... التزم بتصريف البضاعة المباعة وعدم إرجاعها ونتحمل المسئولية كامله .</p>
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "30px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            المندوب<br /><span className="out-text">{d.rep as string}</span>
-            {showRepSig && <SignatureImg src={repSig} />}
+          <div>المندوب<br /><span className="out-text">{d.rep as string}</span></div>
+          <div>
+            مدير الفرع<br />
+            {managerName ? <span className="out-text" style={{ fontWeight: "bold" }}>{managerName}</span> : <span>...................</span>}
           </div>
-          <div>مدير الفرع<br />{showManagerSig && mgrSig ? <SignatureImg src={mgrSig} /> : <span>...................</span>}</div>
           <div>المكتب العلمي<br />...................</div>
           <div>مدير القطاع<br />...................</div>
         </div>
@@ -210,11 +200,11 @@ function RecordContent({ record, showRepSig, showManagerSig, managerSigUrl }: {
           </div>
         ))}
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            المندوب<br /><span className="out-text">{d.rep as string}</span>
-            {showRepSig && <SignatureImg src={repSig} />}
+          <div>المندوب<br /><span className="out-text">{d.rep as string}</span></div>
+          <div>
+            مدير الفرع<br />
+            {managerName ? <span className="out-text" style={{ fontWeight: "bold" }}>{managerName}</span> : <span>...................</span>}
           </div>
-          <div>مدير الفرع<br />{showManagerSig && mgrSig ? <SignatureImg src={mgrSig} /> : <span>...................</span>}</div>
           <div>المكتب العلمي<br />...................</div>
           <div>مدير القطاع<br />...................</div>
         </div>
@@ -231,6 +221,7 @@ const RepRecordsPage = () => {
   const [rep, setRep] = useState<User | null>(null);
   const [repForms, setRepForms] = useState<FormRecord[]>([]);
   const [viewRecord, setViewRecord] = useState<FormRecord | null>(null);
+  const [managerName, setManagerName] = useState<string>("");
 
   const loadData = () => {
     const users = getUsers();
@@ -240,24 +231,16 @@ const RepRecordsPage = () => {
       const allRecords = getAll();
       setRepForms(allRecords.filter(r => r.userId === repId && r.status === 'pending-approval'));
     }
+    if (user) {
+      setManagerName(getManagerName(user.id) || user.displayName || "");
+    }
   };
 
-  useEffect(() => { loadData(); }, [repId]);
+  useEffect(() => { loadData(); }, [repId, user]);
 
   const handleApprove = (record: FormRecord) => {
     if (!user) return;
-    const sig = getManagerSignature(user.id);
-    if (!sig) {
-      toast({
-        title: "لا يوجد توقيع",
-        description: "يرجى إعداد توقيع مدير الفرع أولاً من لوحة التحكم ← إعدادات التوقيع",
-        variant: "destructive"
-      });
-      return;
-    }
-    updateRecordSignature(record.id, 'managerSignature', sig);
     updateRecordStatus(record.id, 'approved');
-    // Send notification to the rep
     if (record.userId) {
       addApprovalNotification(record.userId, record.type, getRecordName(record));
     }
@@ -331,9 +314,7 @@ const RepRecordsPage = () => {
               <FormHeader />
               <RecordContent
                 record={viewRecord}
-                showRepSig={true}
-                showManagerSig={!!viewRecord.managerSignature}
-                managerSigUrl={viewRecord.managerSignature}
+                managerName={viewRecord.status === 'approved' ? managerName : undefined}
               />
             </div>
           )}

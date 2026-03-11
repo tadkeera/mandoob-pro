@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Home, ClipboardList, Database, Menu, X, PenTool, Users, LayoutDashboard, LogOut } from "lucide-react";
+import { FileText, Home, ClipboardList, Database, Menu, X, Users, LayoutDashboard, LogOut } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import companyLogo from "@/assets/company-logo.png";
 
@@ -20,7 +20,6 @@ const allNavItems: NavItem[] = [
   { path: "/consignment", label: "تصريف", icon: FileText },
   { path: "/extra-bonus", label: "بونص إضافي", icon: FileText },
   { path: "/reports", label: "السجلات", icon: ClipboardList },
-  { path: "/signature", label: "التوقيع", icon: PenTool },
   { path: "/data-management", label: "النسخ الاحتياطي", icon: Database, hideForRoles: ["representative"] },
   { path: "/user-management", label: "إدارة المستخدمين", icon: Users, hideForRoles: ["representative"] },
 ];
@@ -33,7 +32,6 @@ const Navbar = () => {
   const navItems = user?.role === 'branch-manager'
     ? [
         { path: "/manager-dashboard", label: "لوحة المدير", icon: LayoutDashboard },
-        { path: "/signature", label: "التوقيع", icon: PenTool },
       ]
     : allNavItems.filter(item => {
         if (!user) return true;
