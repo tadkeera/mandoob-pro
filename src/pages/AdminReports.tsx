@@ -572,7 +572,7 @@ const AdminReports = () => {
               style={{ border: "2px solid #000", borderRadius: "5px", padding: "16px" }}
             >
               <FormHeader />
-              <RecordContent record={viewRecord} />
+              <RecordContent record={viewRecord} managerNameMap={managerNameMap} />
             </div>
           )}
           <div className="flex justify-end gap-2 mt-4 no-print">

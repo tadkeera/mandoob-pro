@@ -59,7 +59,6 @@ const AppContent = () => {
           <Route path="/extra-bonus" element={<ExtraBonusForm />} />
           <Route path="/reports" element={<ReportsIndex />} />
           <Route path="/reports/:type" element={<Reports />} />
-          <Route path="/signature" element={<SignaturePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </>
@@ -77,7 +76,6 @@ const AppContent = () => {
         <Route path="/extra-bonus" element={<ExtraBonusForm />} />
         <Route path="/reports" element={<ReportsIndex />} />
         <Route path="/reports/:type" element={<Reports />} />
-        <Route path="/signature" element={<SignaturePage />} />
         <Route path="/data-management" element={<DataManagement />} />
         <Route path="/user-management" element={<UserManagement />} />
         <Route path="/manager-dashboard" element={<ManagerDashboard />} />
