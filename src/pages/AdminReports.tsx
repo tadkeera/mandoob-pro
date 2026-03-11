@@ -436,6 +436,7 @@ const AdminReports = () => {
   const [viewRecord, setViewRecord] = useState<FormRecord | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [globalFilter, setGlobalFilter] = useState<FilterStatus>("all");
+  const [managerNameMap, setManagerNameMap] = useState<Record<string, string>>({});
 
   // Redirect if not admin
   useEffect(() => {
@@ -456,6 +457,16 @@ const AdminReports = () => {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     });
+
+    // Build manager names per rep (based on branch-manager users)
+    const managerUsers = users.filter(u => u.role === "branch-manager");
+    const nameMap: Record<string, string> = {};
+    managerUsers.forEach(mgr => {
+      const name = getManagerName(mgr.id) || mgr.displayName;
+      // Map to all reps (simplified - one manager name for all)
+      repUsers.forEach(rep => { nameMap[rep.id] = name; });
+    });
+    setManagerNameMap(nameMap);
     setReps(repUsers);
     setRecordsMap(map);
   };
