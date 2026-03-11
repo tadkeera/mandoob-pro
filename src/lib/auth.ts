@@ -94,31 +94,30 @@ export function isLoggedIn(): boolean {
   return getCurrentUser() !== null;
 }
 
-// Manager signature stored per user
-const MANAGER_SIG_KEY = 'bilquis-manager-signature';
+// Manager name stored per user
+const MANAGER_NAME_KEY = 'bilquis-manager-name';
 
-export function saveManagerSignature(userId: string, dataUrl: string): void {
-  const sigs = getManagerSignatures();
-  sigs[userId] = dataUrl;
-  localStorage.setItem(MANAGER_SIG_KEY, JSON.stringify(sigs));
+export function saveManagerName(userId: string, name: string): void {
+  const names = getManagerNames();
+  names[userId] = name;
+  localStorage.setItem(MANAGER_NAME_KEY, JSON.stringify(names));
 }
 
-export function getManagerSignature(userId: string): string | null {
-  const sigs = getManagerSignatures();
-  return sigs[userId] || null;
+export function getManagerName(userId: string): string | null {
+  const names = getManagerNames();
+  return names[userId] || null;
 }
 
-function getManagerSignatures(): Record<string, string> {
+function getManagerNames(): Record<string, string> {
   try {
-    const data = localStorage.getItem(MANAGER_SIG_KEY);
+    const data = localStorage.getItem(MANAGER_NAME_KEY);
     return data ? JSON.parse(data) : {};
   } catch {
     return {};
   }
 }
 
-export function deleteManagerSignature(userId: string): void {
-  const sigs = getManagerSignatures();
-  delete sigs[userId];
-  localStorage.setItem(MANAGER_SIG_KEY, JSON.stringify(sigs));
-}
+// Keep legacy signature functions as no-ops for backward compatibility
+export function saveManagerSignature(_userId: string, _dataUrl: string): void {}
+export function getManagerSignature(_userId: string): string | null { return null; }
+export function deleteManagerSignature(_userId: string): void {}
