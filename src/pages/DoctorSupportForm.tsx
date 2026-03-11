@@ -1,13 +1,13 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import FormHeader from "@/components/FormHeader";
 import { save } from "@/lib/db";
-import { getSignature } from "@/lib/signature";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Save, RotateCcw, Plus, Trash2 } from "lucide-react";
+import { Save, RotateCcw, Plus, Trash2, Eye } from "lucide-react";
 
 interface Pharmacy {
   name: string;
@@ -25,7 +25,7 @@ const DoctorSupportForm = () => {
   });
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [newPharmacy, setNewPharmacy] = useState<Pharmacy>({ name: "", phone: "", amount: "" });
-  const printRef = useRef<HTMLDivElement>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const update = (field: string, value: string) => setFormData(prev => ({ ...prev, [field]: value }));
   const addPharmacy = () => {
@@ -40,27 +40,14 @@ const DoctorSupportForm = () => {
     toast({ title: "تم الحفظ", description: "تم حفظ الاستمارة بنجاح" });
   };
 
-  // FIX: حفظ مع التوقيع - يحفظ السجل وتظهر رسالة نجاح واضحة
-  const handleSaveWithSignature = () => {
-    const sig = getSignature(user?.id);
-    if (!sig) {
-      toast({ title: "لا يوجد توقيع", description: "يرجى رفع توقيع أولاً من صفحة إدارة التوقيع", variant: "destructive" });
-      return;
-    }
-    save({ type: "doctor-support", data: { ...formData, pharmacies, doctorName: formData.doctor }, userId: user?.id, repSignature: sig });
-    toast({ title: "تم الحفظ مع التوقيع ✓", description: "تم حفظ الاستمارة مع التوقيع بنجاح وأُضيفت للسجلات" });
-  };
-
   const handleReset = () => {
     setFormData({ date: "", supervisor: "", amount: "", rep: "", doctor: "", specialty: "", morning: "", evening: "", landline: "", mobile: "", purpose: "", items: "" });
     setPharmacies([]);
   };
 
-  const repSignature = getSignature(user?.id);
-
   return (
     <div className="container mx-auto px-4 py-6 animate-fade-in">
-      <div className="bg-card rounded-lg shadow-md p-4 md:p-6 mb-6 no-print">
+      <div className="bg-card rounded-lg shadow-md p-4 md:p-6 mb-6">
         <h2 className="text-xl font-bold text-primary mb-4">إدخال بيانات: استمارة دعم طبيب</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><Label>التاريخ</Label><Input type="date" value={formData.date} onChange={e => update("date", e.target.value)} /></div>
@@ -99,90 +86,88 @@ const DoctorSupportForm = () => {
         )}
         <div className="flex flex-wrap gap-3 mt-6">
           <Button onClick={handleSave} className="gap-2"><Save className="h-4 w-4" />حفظ</Button>
-          <Button onClick={handleSaveWithSignature} variant="secondary" className="gap-2"><Save className="h-4 w-4" />حفظ مع التوقيع</Button>
+          <Button variant="outline" onClick={() => setShowPreview(true)} className="gap-2"><Eye className="h-4 w-4" />معاينة النموذج</Button>
           <Button variant="outline" onClick={handleReset} className="gap-2"><RotateCcw className="h-4 w-4" />مسح</Button>
         </div>
-        {!repSignature && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            ملاحظة: لاستخدام "حفظ مع التوقيع"، يرجى أولاً رفع توقيعك من صفحة <a href="/signature" className="text-primary underline">إدارة التوقيع</a>
-          </p>
-        )}
       </div>
 
-      <div id="doctor-support-print" ref={printRef} className="print-area print-page">
-        <FormHeader />
-        <h1 style={{ fontSize: "16px", fontWeight: "bold", margin: "5px 0 10px 0", textAlign: "center" }}>استمارة دعم طبيب</h1>
-        <div className="top-half" style={{ marginBottom: "10px" }}>
-          <div style={{ fontWeight: "bold", marginBottom: "10px" }}>التاريخ: <span className="out-text">{formData.date}</span></div>
-          <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>الأخ مشرف شركة:</span><span className="dotted-line out-text">{formData.supervisor}</span><span style={{ whiteSpace: "nowrap" }}>المحترم، بعد التحية،</span></div>
-          <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>نرجو منكم الموافقة على صرف مبلغ وقدره (</span><span className="dotted-line out-text">{formData.amount}</span><span style={{ whiteSpace: "nowrap" }}>) فقط.</span></div>
-          <div className="flex-row">
-            <div style={{ flexBasis: "55%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>للأخ الدكتور:</span><span className="dotted-line out-text">{formData.doctor}</span></div>
-            <div style={{ flexBasis: "42%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>أخصائي:</span><span className="dotted-line out-text">{formData.specialty}</span></div>
-          </div>
-          <div className="flex-row">
-            <div style={{ flexBasis: "48%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>يعمل صباحاً في:</span><span className="dotted-line out-text">{formData.morning}</span></div>
-            <div style={{ flexBasis: "48%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>ومساءً في:</span><span className="dotted-line out-text">{formData.evening}</span></div>
-          </div>
-          <div className="flex-row">
-            <div style={{ flexBasis: "48%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>تلفون ثابت:</span><span className="dotted-line out-text">{formData.landline}</span></div>
-            <div style={{ flexBasis: "48%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>تلفون سيار:</span><span className="dotted-line out-text">{formData.mobile}</span></div>
-          </div>
-          <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>مقابل / </span><span className="dotted-line out-text">{formData.purpose}</span></div>
-          <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>لكتابة الأصناف التالية: </span><span className="dotted-line out-text">{formData.items}</span></div>
-          <div style={{ marginTop: "5px" }}>
-            <span style={{ fontWeight: "bold" }}>والصيدليات المجاورة للمذكور:</span>
-            <table className="compact-table">
-              <thead><tr><th style={{ width: "40%" }}>اسم الصيدلية</th><th style={{ width: "30%" }}>رقم الهاتف</th><th style={{ width: "30%" }}>قيمة المشتريات</th></tr></thead>
-              <tbody>
-                {pharmacies.length === 0 ? <tr><td colSpan={3} style={{ color: "#777" }}>لم يتم إضافة صيدليات</td></tr> : pharmacies.map((p, i) => <tr key={i}><td>{p.name}</td><td dir="ltr">{p.phone}</td><td>{p.amount}</td></tr>)}
-              </tbody>
-            </table>
-          </div>
-          <p style={{ margin: "5px 0 10px 0", fontSize: "12px", textAlign: "center", fontWeight: "bold" }}>وعليه نلتزم بوفاء المذكور بكتابة الأصناف، وفي حالة عدم الوفاء فنحن نتحمل المسؤولية كاملة.</p>
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "13px", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              مقدم الطلب: <span className="out-text">{formData.rep}</span>
-              {repSignature && <img src={repSignature} alt="التوقيع" style={{ width: "90px", height: "45px", objectFit: "contain" }} />}
+      {/* Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>معاينة: استمارة دعم طبيب</DialogTitle>
+          </DialogHeader>
+          <div id="doctor-support-print" className="print-page" style={{ border: "2px solid #000", borderRadius: "5px", padding: "16px" }}>
+            <FormHeader />
+            <h1 style={{ fontSize: "16px", fontWeight: "bold", margin: "5px 0 10px 0", textAlign: "center" }}>استمارة دعم طبيب</h1>
+            <div style={{ fontWeight: "bold", marginBottom: "10px" }}>التاريخ: <span className="out-text">{formData.date}</span></div>
+            <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>الأخ مشرف شركة:</span><span className="dotted-line out-text">{formData.supervisor}</span><span style={{ whiteSpace: "nowrap" }}>المحترم، بعد التحية،</span></div>
+            <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>نرجو منكم الموافقة على صرف مبلغ وقدره (</span><span className="dotted-line out-text">{formData.amount}</span><span style={{ whiteSpace: "nowrap" }}>) فقط.</span></div>
+            <div className="flex-row">
+              <div style={{ flexBasis: "55%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>للأخ الدكتور:</span><span className="dotted-line out-text">{formData.doctor}</span></div>
+              <div style={{ flexBasis: "42%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>أخصائي:</span><span className="dotted-line out-text">{formData.specialty}</span></div>
             </div>
-            <div>مدير الفرع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "120px" }}></span></div>
-          </div>
-        </div>
-        <div className="bottom-half" style={{ fontSize: "12px" }}>
-          <div className="box">
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>الأخ / مدير القطاع</span><span className="dotted-line"></span><span>المحترم،</span></div>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>نرجو الموافقة على صرف مبلغ وقدره (</span><span className="dotted-line"></span><span>) فقط للمذكور أعلاه.</span></div>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>مقابل</span><span className="dotted-line"></span></div>
-            <p style={{ margin: "5px 0" }}>ونتحمل كامل المسؤولية بالتواصل مع الطبيب المذكور للتأكد من استلام الخدمة.</p>
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginTop: "10px" }}>
-              <div>المكتب العلمي (الاسم): <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
-              <div>التوقيع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
+            <div className="flex-row">
+              <div style={{ flexBasis: "48%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>يعمل صباحاً في:</span><span className="dotted-line out-text">{formData.morning}</span></div>
+              <div style={{ flexBasis: "48%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>ومساءً في:</span><span className="dotted-line out-text">{formData.evening}</span></div>
+            </div>
+            <div className="flex-row">
+              <div style={{ flexBasis: "48%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>تلفون ثابت:</span><span className="dotted-line out-text">{formData.landline}</span></div>
+              <div style={{ flexBasis: "48%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>تلفون سيار:</span><span className="dotted-line out-text">{formData.mobile}</span></div>
+            </div>
+            <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>مقابل / </span><span className="dotted-line out-text">{formData.purpose}</span></div>
+            <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>لكتابة الأصناف التالية: </span><span className="dotted-line out-text">{formData.items}</span></div>
+            <div style={{ marginTop: "5px" }}>
+              <span style={{ fontWeight: "bold" }}>والصيدليات المجاورة للمذكور:</span>
+              <table className="compact-table">
+                <thead><tr><th style={{ width: "40%" }}>اسم الصيدلية</th><th style={{ width: "30%" }}>رقم الهاتف</th><th style={{ width: "30%" }}>قيمة المشتريات</th></tr></thead>
+                <tbody>
+                  {pharmacies.length === 0 ? <tr><td colSpan={3} style={{ color: "#777" }}>لم يتم إضافة صيدليات</td></tr> : pharmacies.map((p, i) => <tr key={i}><td>{p.name}</td><td dir="ltr">{p.phone}</td><td>{p.amount}</td></tr>)}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ margin: "5px 0 10px 0", fontSize: "12px", textAlign: "center", fontWeight: "bold" }}>وعليه نلتزم بوفاء المذكور بكتابة الأصناف، وفي حالة عدم الوفاء فنحن نتحمل المسؤولية كاملة.</p>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "13px", alignItems: "center" }}>
+              <div>مقدم الطلب: <span className="out-text">{formData.rep}</span></div>
+              <div>مدير الفرع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "120px" }}></span></div>
+            </div>
+            <div style={{ fontSize: "12px", marginTop: "8px" }}>
+              <div className="box">
+                <div className="flex-row" style={{ fontWeight: "bold" }}><span>الأخ / مدير القطاع</span><span className="dotted-line"></span><span>المحترم،</span></div>
+                <div className="flex-row" style={{ fontWeight: "bold" }}><span>نرجو الموافقة على صرف مبلغ وقدره (</span><span className="dotted-line"></span><span>) فقط للمذكور أعلاه.</span></div>
+                <div className="flex-row" style={{ fontWeight: "bold" }}><span>مقابل</span><span className="dotted-line"></span></div>
+                <p style={{ margin: "5px 0" }}>ونتحمل كامل المسؤولية بالتواصل مع الطبيب المذكور للتأكد من استلام الخدمة.</p>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginTop: "10px" }}>
+                  <div>المكتب العلمي (الاسم): <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
+                  <div>التوقيع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
+                </div>
+              </div>
+              <div className="box">
+                <h4 style={{ fontWeight: "bold", margin: "0 0 5px 0", textDecoration: "underline" }}>الموافقة النهائية</h4>
+                <div className="flex-row" style={{ fontWeight: "bold" }}><span>يعتمد ويقيد على حساب شركة /</span><span className="dotted-line"></span></div>
+                <div style={{ fontWeight: "bold", margin: "6px 0" }}>علماً بأن آخر دعم للمذكور كان بتاريخ &nbsp;&nbsp; / &nbsp;&nbsp; / 202&nbsp; م.</div>
+                <div style={{ fontWeight: "bold" }}>مدير القطاع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "150px" }}></span></div>
+              </div>
+              <div className="box">
+                <div className="flex-row" style={{ fontWeight: "bold" }}><span>الأخ أمين الصندوق لفرع</span><span className="dotted-line"></span><span>المحترم،</span></div>
+                <div className="flex-row" style={{ fontWeight: "bold" }}><span>لا مانع من صرف (</span><span className="dotted-line"></span><span>) للأخ د.</span><span className="dotted-line"></span></div>
+                <div className="flex-row" style={{ fontWeight: "bold" }}><span>ويقيد على حساب شركة (</span><span className="dotted-line"></span><span>)</span></div>
+                <div style={{ display: "flex", justifyContent: "space-around", fontWeight: "bold", marginTop: "10px" }}>
+                  <div>المدير العام: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
+                  <div>مدير المبيعات: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
+                </div>
+              </div>
+              <div className="box" style={{ backgroundColor: "#f9f9f9", border: "2px solid #000" }}>
+                <p style={{ margin: "0 0 6px 0", fontWeight: "bold", textAlign: "center" }}>استلمت المبلغ لدعم الطبيب المذكور أعلاه ونلتزم بكتابة الأصناف ونتحمل المسؤولية كاملة.</p>
+                <div style={{ display: "flex", justifyContent: "space-around", fontWeight: "bold" }}>
+                  <div>الاسم: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "120px" }}></span></div>
+                  <div>التوقيع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "120px" }}></span></div>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="box">
-            <h4 style={{ fontWeight: "bold", margin: "0 0 5px 0", textDecoration: "underline" }}>الموافقة النهائية</h4>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>يعتمد ويقيد على حساب شركة /</span><span className="dotted-line"></span></div>
-            <div style={{ fontWeight: "bold", margin: "6px 0" }}>علماً بأن آخر دعم للمذكور كان بتاريخ &nbsp;&nbsp; / &nbsp;&nbsp; / 202&nbsp; م.</div>
-            <div style={{ fontWeight: "bold" }}>مدير القطاع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "150px" }}></span></div>
-          </div>
-          <div className="box">
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>الأخ أمين الصندوق لفرع</span><span className="dotted-line"></span><span>المحترم،</span></div>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>لا مانع من صرف (</span><span className="dotted-line"></span><span>) للأخ د.</span><span className="dotted-line"></span></div>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>ويقيد على حساب شركة (</span><span className="dotted-line"></span><span>)</span></div>
-            <div style={{ display: "flex", justifyContent: "space-around", fontWeight: "bold", marginTop: "10px" }}>
-              <div>المدير العام: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
-              <div>مدير المبيعات: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
-            </div>
-          </div>
-          <div className="box box-receipt">
-            <p style={{ margin: "0 0 6px 0", fontWeight: "bold", textAlign: "center" }}>استلمت المبلغ لدعم الطبيب المذكور أعلاه ونلتزم بكتابة الأصناف ونتحمل المسؤولية كاملة.</p>
-            <div style={{ display: "flex", justifyContent: "space-around", fontWeight: "bold" }}>
-              <div>الاسم: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "120px" }}></span></div>
-              <div>التوقيع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "120px" }}></span></div>
-            </div>
-          </div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
