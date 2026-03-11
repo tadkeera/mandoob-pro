@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getUsers, type User } from "@/lib/auth";
+import { getUsers, type User, getManagerName } from "@/lib/auth";
 import { getAll, deleteRecord, type FormRecord } from "@/lib/db";
 import { printElement } from "@/lib/pdfUtils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,19 +60,6 @@ function getRecordName(record: FormRecord): string {
   if (record.type === "consignment") return (d.clientName || "") as string;
   if (record.type === "extra-bonus") return (d.subject || d.clientName || "") as string;
   return "";
-}
-
-// ─── Signature helper ─────────────────────────────────────────────────────────
-
-function SigImg({ src }: { src?: string | null }) {
-  if (!src) return <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "110px" }} />;
-  return (
-    <img
-      src={src}
-      alt="التوقيع"
-      style={{ width: "100px", height: "48px", objectFit: "contain", display: "inline-block", verticalAlign: "middle" }}
-    />
-  );
 }
 
 // ─── Form content renderer ────────────────────────────────────────────────────
