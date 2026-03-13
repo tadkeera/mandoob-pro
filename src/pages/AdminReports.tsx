@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getUsers, type User, getManagerName } from "@/lib/auth";
-import { getAll, deleteRecord, type FormRecord } from "@/lib/db";
+import { getUsers, type User } from "@/lib/supabaseAuth";
+import { getAll, deleteRecord, type FormRecord } from "@/lib/supabaseDb";
 import { printElement } from "@/lib/pdfUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
