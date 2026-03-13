@@ -14,16 +14,157 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      forms: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_by_name: string | null
+          created_at: string
+          data: Json
+          id: string
+          status: Database["public"]["Enums"]["form_status"]
+          submitted_for_approval_at: string | null
+          type: Database["public"]["Enums"]["form_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name?: string | null
+          created_at?: string
+          data?: Json
+          id?: string
+          status?: Database["public"]["Enums"]["form_status"]
+          submitted_for_approval_at?: string | null
+          type: Database["public"]["Enums"]["form_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name?: string | null
+          created_at?: string
+          data?: Json
+          id?: string
+          status?: Database["public"]["Enums"]["form_status"]
+          submitted_for_approval_at?: string | null
+          type?: Database["public"]["Enums"]["form_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          form_id: string | null
+          form_name: string | null
+          form_type: string
+          id: string
+          is_read: boolean
+          message: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          form_id?: string | null
+          form_name?: string | null
+          form_type: string
+          id?: string
+          is_read?: boolean
+          message: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          form_id?: string | null
+          form_name?: string | null
+          form_type?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          display_name: string
+          id: string
+          manager_name: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          display_name: string
+          id: string
+          manager_name?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          manager_name?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "branch-manager" | "representative"
+      form_status: "draft" | "pending-approval" | "approved"
+      form_type: "doctor-support" | "consignment" | "extra-bonus"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +291,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "branch-manager", "representative"],
+      form_status: ["draft", "pending-approval", "approved"],
+      form_type: ["doctor-support", "consignment", "extra-bonus"],
+    },
   },
 } as const
