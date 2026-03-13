@@ -4,10 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import FormHeader from "@/components/FormHeader";
-import { save } from "@/lib/db";
+import { save } from "@/lib/supabaseDb";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Save, RotateCcw, Plus, Trash2, UserPlus, Eye } from "lucide-react";
+import { Save, RotateCcw, Plus, Trash2, UserPlus, Eye, Loader2 } from "lucide-react";
 
 interface ConsignmentItem { name: string; qty: string; date: string; }
 interface ClientGroup { clientName: string; items: ConsignmentItem[]; }
@@ -15,6 +15,7 @@ interface ClientGroup { clientName: string; items: ConsignmentItem[]; }
 const ConsignmentForm = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({ date: "", branch: "", rep: "" });
   const [clients, setClients] = useState<ClientGroup[]>([{ clientName: "", items: [] }]);
   const [newItems, setNewItems] = useState<Record<number, ConsignmentItem>>({});
@@ -36,10 +37,21 @@ const ConsignmentForm = () => {
   const addClient = () => setClients(prev => [...prev, { clientName: "", items: [] }]);
   const removeClient = (idx: number) => { if (clients.length <= 1) return; setClients(prev => prev.filter((_, i) => i !== idx)); };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
     const allClients = clients.map(c => c.clientName).filter(Boolean).join("، ");
-    save({ type: "consignment", data: { ...formData, clients, clientName: allClients }, userId: user?.id });
-    toast({ title: "تم الحفظ", description: "تم حفظ نموذج التصريف بنجاح" });
+    const result = await save({
+      type: "consignment",
+      data: { ...formData, clients, clientName: allClients },
+      userId: user.id,
+    });
+    setSaving(false);
+    if (result) {
+      toast({ title: "✅ تم الحفظ", description: "تم حفظ نموذج التصريف بنجاح" });
+    } else {
+      toast({ title: "خطأ", description: "فشل في حفظ النموذج", variant: "destructive" });
+    }
   };
 
   const handleReset = () => { setFormData({ date: "", branch: "", rep: "" }); setClients([{ clientName: "", items: [] }]); };
@@ -82,18 +94,18 @@ const ConsignmentForm = () => {
         ))}
         <Button variant="outline" onClick={addClient} className="gap-2 mb-4"><UserPlus className="h-4 w-4" />إضافة عميل آخر</Button>
         <div className="flex flex-wrap gap-3 mt-4">
-          <Button onClick={handleSave} className="gap-2"><Save className="h-4 w-4" />حفظ</Button>
+          <Button onClick={handleSave} className="gap-2" disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            حفظ
+          </Button>
           <Button variant="outline" onClick={() => setShowPreview(true)} className="gap-2"><Eye className="h-4 w-4" />معاينة النموذج</Button>
           <Button variant="outline" onClick={handleReset} className="gap-2"><RotateCcw className="h-4 w-4" />مسح</Button>
         </div>
       </div>
 
-      {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>معاينة: نموذج تصريف</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>معاينة: نموذج تصريف</DialogTitle></DialogHeader>
           <div id="consignment-print" className="print-page" style={{ border: "2px solid #000", borderRadius: "5px", padding: "16px" }}>
             <FormHeader />
             <div style={{ textAlign: "center", fontWeight: "bold", marginBottom: "10px" }}>بسم الله الرحمن الرحيم</div>
