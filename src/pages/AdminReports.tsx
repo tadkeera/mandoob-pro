@@ -443,10 +443,10 @@ const AdminReports = () => {
     if (user && user.role !== "admin") navigate("/");
   }, [user]);
 
-  const loadData = () => {
-    const users = getUsers();
+  const loadData = async () => {
+    const users = await getUsers();
     const repUsers = users.filter((u) => u.role === "representative");
-    const all = getAll();
+    const all = await getAll();
     const map: Record<string, FormRecord[]> = {};
     repUsers.forEach((rep) => {
       let repRecords = all.filter((r) => r.userId === rep.id);
@@ -457,14 +457,10 @@ const AdminReports = () => {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     });
-
-    // Build manager names per rep (based on branch-manager users)
     const managerUsers = users.filter(u => u.role === "branch-manager");
     const nameMap: Record<string, string> = {};
     managerUsers.forEach(mgr => {
-      const name = getManagerName(mgr.id) || mgr.displayName;
-      // Map to all reps (simplified - one manager name for all)
-      repUsers.forEach(rep => { nameMap[rep.id] = name; });
+      repUsers.forEach(rep => { nameMap[rep.id] = mgr.managerName || mgr.displayName; });
     });
     setManagerNameMap(nameMap);
     setReps(repUsers);
