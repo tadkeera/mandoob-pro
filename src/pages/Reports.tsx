@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getByType, getByTypeAndUser, deleteRecord, updateRecord, updateRecordStatus, type FormRecord } from "@/lib/db";
+import { getByTypeAndUser, getByType, updateRecordStatus, type FormRecord, type FormType } from "@/lib/supabaseDb";
 import { printElement } from "@/lib/pdfUtils";
-import { getSignature } from "@/lib/signature";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowRight, CheckCircle } from "lucide-react";
+import { Printer, ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import FormHeader from "@/components/FormHeader";
@@ -16,6 +15,12 @@ const typeLabels: Record<string, string> = {
   "extra-bonus": "سجلات نماذج البونص الإضافي",
 };
 
+const statusLabels: Record<string, string> = {
+  draft: "مسودة",
+  "pending-approval": "بانتظار الاعتماد",
+  approved: "معتمد",
+};
+
 function getRecordName(record: FormRecord): string {
   const d = record.data;
   if (record.type === "doctor-support") return (d.doctor || d.doctorName || "") as string;
@@ -24,24 +29,9 @@ function getRecordName(record: FormRecord): string {
   return "";
 }
 
-const statusLabels: Record<string, string> = {
-  draft: "مسودة",
-  "pending-approval": "بانتظار الاعتماد",
-  approved: "معتمد",
-};
-
-// Signature inline component
-function SignatureImage({ src, width = 80, height = 40 }: { src?: string | null; width?: number; height?: number }) {
-  if (!src) return null;
-  return (
-    <img src={src} alt="التوقيع" style={{ width: `${width}px`, height: `${height}px`, objectFit: "contain", display: "inline-block", verticalAlign: "middle" }} />
-  );
-}
-
-function RecordPrintContent({ record, showSignature = false, showManagerSignature = false }: { record: FormRecord; showSignature?: boolean; showManagerSignature?: boolean }) {
+function RecordPrintContent({ record }: { record: FormRecord }) {
   const d = record.data;
-  const sig = showSignature ? (record.repSignature || getSignature()) : null;
-  const mgrSig = showManagerSignature ? record.managerSignature : null;
+  const mgr = record.approvedByName;
 
   if (record.type === "doctor-support") {
     const pharmacies = (d.pharmacies as any[]) || [];
@@ -52,7 +42,7 @@ function RecordPrintContent({ record, showSignature = false, showManagerSignatur
         <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>الأخ مشرف شركة:</span><span className="dotted-line out-text">{d.supervisor as string}</span><span style={{ whiteSpace: "nowrap" }}>المحترم، بعد التحية،</span></div>
         <div className="flex-row"><span style={{ whiteSpace: "nowrap" }}>نرجو منكم الموافقة على صرف مبلغ وقدره (</span><span className="dotted-line out-text">{d.amount as string}</span><span style={{ whiteSpace: "nowrap" }}>) فقط.</span></div>
         <div className="flex-row">
-          <div style={{ flexBasis: "55%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>للأخ الدكتور:</span><span className="dotted-line out-text">{d.doctor as string}</span></div>
+          <div style={{ flexBasis: "55%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>للأخ الدكتور:</span><span className="dotted-line out-text">{(d.doctor || d.doctorName) as string}</span></div>
           <div style={{ flexBasis: "42%", display: "flex", alignItems: "baseline" }}><span style={{ whiteSpace: "nowrap" }}>أخصائي:</span><span className="dotted-line out-text">{d.specialty as string}</span></div>
         </div>
         <div className="flex-row">
@@ -69,172 +59,95 @@ function RecordPrintContent({ record, showSignature = false, showManagerSignatur
           <span style={{ fontWeight: "bold" }}>والصيدليات المجاورة للمذكور:</span>
           <table className="compact-table">
             <thead><tr><th style={{ width: "40%" }}>اسم الصيدلية</th><th style={{ width: "30%" }}>رقم الهاتف</th><th style={{ width: "30%" }}>قيمة المشتريات</th></tr></thead>
-            <tbody>
-              {pharmacies.length === 0 ? <tr><td colSpan={3} style={{ color: "#777" }}>لم يتم إضافة صيدليات</td></tr> : pharmacies.map((p: any, i: number) => <tr key={i}><td>{p.name}</td><td dir="ltr">{p.phone}</td><td>{p.amount}</td></tr>)}
-            </tbody>
+            <tbody>{pharmacies.length === 0 ? <tr><td colSpan={3} style={{ color: "#777" }}>لم يتم إضافة صيدليات</td></tr> : pharmacies.map((p: any, i: number) => <tr key={i}><td>{p.name}</td><td dir="ltr">{p.phone}</td><td>{p.amount}</td></tr>)}</tbody>
           </table>
         </div>
         <p style={{ margin: "5px 0 10px 0", fontSize: "12px", textAlign: "center", fontWeight: "bold" }}>وعليه نلتزم بوفاء المذكور بكتابة الأصناف، وفي حالة عدم الوفاء فنحن نتحمل المسؤولية كاملة.</p>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "13px", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مقدم الطلب: <span className="out-text">{d.rep as string}</span>
-            <SignatureImage src={sig} width={90} height={45} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مدير الفرع:
-            {mgrSig ? <SignatureImage src={mgrSig} width={90} height={45} /> : <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "120px" }}></span>}
-          </div>
+          <div>مقدم الطلب: <span className="out-text">{d.rep as string}</span></div>
+          <div>مدير الفرع: {mgr ? <span className="out-text" style={{ fontWeight: "bold" }}>{mgr}</span> : <span style={{ display: "inline-block", borderBottom: "1px dotted #000", minWidth: "120px" }}></span>}</div>
         </div>
-        <div className="bottom-half" style={{ fontSize: "12px", marginTop: "10px" }}>
-          <div className="box">
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>الأخ / مدير القطاع</span><span className="dotted-line"></span><span>المحترم،</span></div>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>نرجو الموافقة على صرف مبلغ وقدره (</span><span className="dotted-line"></span><span>) فقط للمذكور أعلاه.</span></div>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>مقابل</span><span className="dotted-line"></span></div>
-            <p style={{ margin: "5px 0" }}>ونتحمل كامل المسؤولية بالتواصل مع الطبيب المذكور للتأكد من استلام الخدمة.</p>
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginTop: "10px" }}>
-              <div>المكتب العلمي (الاسم): <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
-              <div>التوقيع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
-            </div>
-          </div>
-          <div className="box">
-            <h4 style={{ fontWeight: "bold", margin: "0 0 5px 0", textDecoration: "underline" }}>الموافقة النهائية</h4>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>يعتمد ويقيد على حساب شركة /</span><span className="dotted-line"></span></div>
-            <div style={{ fontWeight: "bold", margin: "6px 0" }}>علماً بأن آخر دعم للمذكور كان بتاريخ &nbsp;&nbsp; / &nbsp;&nbsp; / 202&nbsp; م.</div>
-            <div style={{ fontWeight: "bold" }}>مدير القطاع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "150px" }}></span></div>
-          </div>
-          <div className="box">
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>الأخ أمين الصندوق لفرع</span><span className="dotted-line"></span><span>المحترم،</span></div>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>لا مانع من صرف (</span><span className="dotted-line"></span><span>) للأخ د.</span><span className="dotted-line"></span></div>
-            <div className="flex-row" style={{ fontWeight: "bold" }}><span>ويقيد على حساب شركة (</span><span className="dotted-line"></span><span>)</span></div>
-            <div style={{ display: "flex", justifyContent: "space-around", fontWeight: "bold", marginTop: "10px" }}>
-              <div>المدير العام: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
-              <div>مدير المبيعات: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "100px" }}></span></div>
-            </div>
-          </div>
-          <div className="box box-receipt">
-            <p style={{ margin: "0 0 6px 0", fontWeight: "bold", textAlign: "center" }}>استلمت المبلغ لدعم الطبيب المذكور أعلاه ونلتزم بكتابة الأصناف ونتحمل المسؤولية كاملة.</p>
-            <div style={{ display: "flex", justifyContent: "space-around", fontWeight: "bold" }}>
-              <div>الاسم: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "120px" }}></span></div>
-              <div>التوقيع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "120px" }}></span></div>
-            </div>
-          </div>
+        <div style={{ fontSize: "12px", marginTop: "8px" }}>
+          <div className="box"><div className="flex-row" style={{ fontWeight: "bold" }}><span>الأخ / مدير القطاع</span><span className="dotted-line"></span><span>المحترم،</span></div><div className="flex-row" style={{ fontWeight: "bold" }}><span>نرجو الموافقة على صرف مبلغ وقدره (</span><span className="dotted-line"></span><span>) فقط للمذكور أعلاه.</span></div><p style={{ margin: "5px 0" }}>ونتحمل كامل المسؤولية بالتواصل مع الطبيب المذكور للتأكد من استلام الخدمة.</p></div>
+          <div className="box"><h4 style={{ fontWeight: "bold", margin: "0 0 5px 0", textDecoration: "underline" }}>الموافقة النهائية</h4><div className="flex-row" style={{ fontWeight: "bold" }}><span>يعتمد ويقيد على حساب شركة /</span><span className="dotted-line"></span></div><div style={{ fontWeight: "bold" }}>مدير القطاع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "150px" }}></span></div></div>
+          <div className="box" style={{ backgroundColor: "#f9f9f9", border: "2px solid #000" }}><p style={{ margin: "0 0 6px 0", fontWeight: "bold", textAlign: "center" }}>استلمت المبلغ لدعم الطبيب المذكور أعلاه ونلتزم بكتابة الأصناف ونتحمل المسؤولية كاملة.</p><div style={{ display: "flex", justifyContent: "space-around", fontWeight: "bold" }}><div>الاسم: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "120px" }}></span></div><div>التوقيع: <span style={{ display: "inline-block", borderBottom: "1px dotted #000", width: "120px" }}></span></div></div></div>
         </div>
       </div>
     );
   }
-
   if (record.type === "extra-bonus") {
     const items = (d.items as any[]) || [];
     return (
       <div style={{ fontSize: "13px", lineHeight: 1.5 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", fontWeight: "bold" }}>
-          <div>التاريخ: <span className="out-text">{d.date as string}</span></div>
-          <div>الفرع: <span className="out-text">{d.branch as string}</span></div>
-        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", fontWeight: "bold" }}><div>التاريخ: <span className="out-text">{d.date as string}</span></div><div>الفرع: <span className="out-text">{d.branch as string}</span></div></div>
         <div style={{ fontWeight: "bold", marginBottom: "5px" }}>الأخ/ <span className="out-text">{d.recipient as string}</span></div>
-        <div style={{ textAlign: "left", fontWeight: "bold", marginBottom: "5px" }}>المحترم</div>
         <p style={{ textAlign: "center" }}>بعد التحية ،،،،،</p>
         <div style={{ fontWeight: "bold", margin: "10px 0" }}>الموضوع: بونص اضافي او دعم <span className="out-text">{d.subject as string}</span></div>
-        <p>بالإشارة الى الموضوع أعلاه نرجو تكرمكم بالموافقة على صرف البونص الإضافي للمذكور وذلك على النحو التالي :-</p>
-        <table className="compact-table">
-          <thead><tr><th>الرقم</th><th>اسم الصنف</th><th>الكمية المشتراة</th><th>نسبة البونص</th><th>كمية التعويض عدد</th></tr></thead>
-          <tbody>
-            {items.length === 0 ? <tr><td colSpan={5} style={{ color: "#777" }}>لم يتم إضافة أصناف</td></tr> : items.map((it: any, i: number) => <tr key={i}><td>{i+1}</td><td>{it.name}</td><td>{it.qty}</td><td>{it.bonusPercent}</td><td>{it.compensation}</td></tr>)}
-          </tbody>
-        </table>
-        <div style={{ fontWeight: "bold", marginBottom: "15px" }}>وذلك بفاتورة رقم: <span className="out-text">{d.invoice as string}</span> (<span className="out-text">{d.paymentType as string}</span>)</div>
-        <p>وعليه .... التزم بتصريف البضاعة المباعة وعدم إرجاعها ونتحمل المسئولية كامله .</p>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            المندوب<br /><span className="out-text">{d.rep as string}</span>
-            <SignatureImage src={sig} width={90} height={45} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مدير الفرع<br />
-            {mgrSig ? <SignatureImage src={mgrSig} width={90} height={45} /> : <span>...................</span>}
-          </div>
-          <div>المكتب العلمي<br /><br />...................</div>
-          <div>مدير القطاع<br /><br />...................</div>
+        <table className="compact-table"><thead><tr><th>الرقم</th><th>اسم الصنف</th><th>الكمية المشتراة</th><th>نسبة البونص</th><th>كمية التعويض عدد</th></tr></thead><tbody>{items.map((it: any, i: number) => <tr key={i}><td>{i+1}</td><td>{it.name}</td><td>{it.qty}</td><td>{it.bonusPercent}</td><td>{it.compensation}</td></tr>)}</tbody></table>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "30px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
+          <div>المندوب<br /><span className="out-text">{d.rep as string}</span></div>
+          <div>مدير الفرع<br />{mgr ? <span className="out-text">{mgr}</span> : <span>...................</span>}</div>
+          <div>المكتب العلمي<br />...................</div>
+          <div>مدير القطاع<br />...................</div>
         </div>
       </div>
     );
   }
-
   if (record.type === "consignment") {
     const clients = (d.clients as any[]) || [];
     return (
       <div style={{ fontSize: "13px", lineHeight: 1.5 }}>
         <div style={{ textAlign: "center", fontWeight: "bold", marginBottom: "10px" }}>بسم الله الرحمن الرحيم</div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", fontWeight: "bold" }}>
-          <div>التاريخ: <span className="out-text">{d.date as string}</span></div>
-          <div>الفرع: <span className="out-text">{d.branch as string}</span></div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginBottom: "15px" }}>
-          <div style={{ display: "flex", flexDirection: "column" }}><span>الاخ / مدير القطاع</span><span>الاخ / مدير المكتب العلمي</span></div>
-          <div style={{ alignSelf: "flex-end" }}>المحترمين</div>
-        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", fontWeight: "bold" }}><div>التاريخ: <span className="out-text">{d.date as string}</span></div><div>الفرع: <span className="out-text">{d.branch as string}</span></div></div>
         <p>بعد التحية ،،،،،،،،،،</p>
         <div style={{ textAlign: "center", fontWeight: "bold", fontSize: "16px", margin: "15px 0", textDecoration: "underline" }}>الموضوع: إنزال بضاعة تحت التصريف</div>
-        <p>اشارة الى الموضوع اعلاه ، نرجو منكم الموافقة على أنزال الاصناف التالية تحت التصريف وعلى مسئوليتي متابعتها أولاً بأول وعدم وجود أي منتهيات والاصناف هي :</p>
         {clients.map((client: any, cIdx: number) => (
           <div key={cIdx} style={{ marginBottom: "10px" }}>
             <div style={{ fontWeight: "bold", marginBottom: "5px" }}>العميل: <span className="out-text">{client.clientName}</span></div>
-            <table className="compact-table">
-              <thead><tr><th>اسم الصنف</th><th>الكمية</th><th>التاريخ</th></tr></thead>
-              <tbody>
-                {(!client.items || client.items.length === 0) ? <tr><td colSpan={3} style={{ color: "#777" }}>لم يتم إضافة أصناف</td></tr> : client.items.map((item: any, i: number) => <tr key={i}><td>{item.name}</td><td>{item.qty}</td><td>{item.date}</td></tr>)}
-              </tbody>
-            </table>
+            <table className="compact-table"><thead><tr><th>اسم الصنف</th><th>الكمية</th><th>التاريخ</th></tr></thead><tbody>{(client.items||[]).map((item: any, i: number) => <tr key={i}><td>{item.name}</td><td>{item.qty}</td><td>{item.date}</td></tr>)}</tbody></table>
           </div>
         ))}
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px", fontWeight: "bold", textAlign: "center", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            المندوب<br /><span className="out-text">{d.rep as string}</span>
-            <SignatureImage src={sig} width={90} height={45} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            مدير الفرع<br />
-            {mgrSig ? <SignatureImage src={mgrSig} width={90} height={45} /> : <span>...................</span>}
-          </div>
-          <div>المكتب العلمي<br /><br />...................</div>
-          <div>مدير القطاع<br /><br />...................</div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px", fontWeight: "bold", textAlign: "center" }}>
+          <div>المندوب<br /><span className="out-text">{d.rep as string}</span></div>
+          <div>مدير الفرع<br />{mgr ? <span className="out-text">{mgr}</span> : <span>...................</span>}</div>
+          <div>المكتب العلمي<br />...................</div>
+          <div>مدير القطاع<br />...................</div>
         </div>
       </div>
     );
   }
-
   return null;
 }
 
 const Reports = () => {
   const { user } = useAuth();
   const { type } = useParams<{ type: string }>();
-  const formType = (type || "doctor-support") as FormRecord["type"];
+  const formType = (type || "doctor-support") as FormType;
   const [records, setRecords] = useState<FormRecord[]>([]);
   const [viewRecord, setViewRecord] = useState<FormRecord | null>(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const reload = () => {
-    if (user?.role === 'representative') {
-      setRecords(getByTypeAndUser(formType, user.id));
+  const reload = async () => {
+    setLoading(true);
+    if (user?.role === "representative") {
+      setRecords(await getByTypeAndUser(formType, user.id));
     } else {
-      setRecords(getByType(formType));
+      setRecords(await getByType(formType));
     }
+    setLoading(false);
   };
 
   useEffect(() => { reload(); }, [formType, user]);
 
   const handlePrint = (record: FormRecord) => {
     setViewRecord(record);
-    setTimeout(() => {
-      printElement("record-preview-print");
-      setViewRecord(null);
-    }, 800);
+    setTimeout(() => { printElement("record-preview-print"); }, 800);
   };
 
-  const handleSubmitForApproval = (record: FormRecord) => {
-    updateRecordStatus(record.id, 'pending-approval');
-    reload();
+  const handleSubmitForApproval = async (record: FormRecord) => {
+    await updateRecordStatus(record.id, "pending-approval");
+    await reload();
     toast({ title: "تم الإرسال", description: "تم إرسال النموذج لاعتماد مدير الفرع" });
   };
 
@@ -248,7 +161,11 @@ const Reports = () => {
         <h1 className="text-2xl font-bold text-primary">{typeLabels[formType] || "السجلات"}</h1>
       </div>
 
-      {records.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : records.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground"><p className="text-lg">لا توجد سجلات محفوظة</p></div>
       ) : (
         <div className="grid gap-4">
@@ -266,40 +183,30 @@ const Reports = () => {
                     </span>
                     {record.status && (
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        record.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        record.status === 'pending-approval' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-muted text-muted-foreground'
+                        record.status === "approved" ? "bg-green-100 text-green-800" :
+                        record.status === "pending-approval" ? "bg-yellow-100 text-yellow-800" :
+                        "bg-muted text-muted-foreground"
                       }`}>
                         {statusLabels[record.status] || record.status}
                       </span>
                     )}
-                    {record.status === 'approved' && (
-                      <span className="text-green-600 text-lg">✅</span>
-                    )}
+                    {record.status === "approved" && <span className="text-green-600 text-lg">✅</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-wrap">
-                  {user?.role === 'representative' && (!record.status || record.status === 'draft') && (
-                    <Button variant="ghost" size="sm" title="ارسال للاعتماد" onClick={() => handleSubmitForApproval(record)} className="gap-1 text-primary">
+                  {user?.role === "representative" && (!record.status || record.status === "draft") && (
+                    <Button variant="ghost" size="sm" onClick={() => handleSubmitForApproval(record)} className="gap-1 text-primary">
                       <CheckCircle className="h-4 w-4" /> ارسال للاعتماد
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" title="طباعة" onClick={() => handlePrint(record)} className="gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => handlePrint(record)} className="gap-1">
                     <Printer className="h-4 w-4 text-primary" /> طباعة
                   </Button>
                 </div>
               </div>
               <div className="mt-2 text-xs text-muted-foreground border-t pt-2 space-y-1">
-                <div>
-                  تاريخ الإرسال للاعتماد: {record.submittedForApprovalAt
-                    ? new Date(record.submittedForApprovalAt).toLocaleString("ar-YE")
-                    : "لم يتم الإرسال بعد"}
-                </div>
-                <div>
-                  اعتماد المدير: {record.approvedAt
-                    ? new Date(record.approvedAt).toLocaleString("ar-YE")
-                    : "قيد الانتظار"}
-                </div>
+                <div>تاريخ الإرسال للاعتماد: {record.submittedForApprovalAt ? new Date(record.submittedForApprovalAt).toLocaleString("ar-YE") : "لم يتم الإرسال بعد"}</div>
+                <div>اعتماد المدير: {record.approvedAt ? new Date(record.approvedAt).toLocaleString("ar-YE") : "قيد الانتظار"}</div>
               </div>
             </div>
           ))}
@@ -312,7 +219,7 @@ const Reports = () => {
           {viewRecord && (
             <div id="record-preview-print" className="print-page" style={{ border: "2px solid #000", borderRadius: "5px" }}>
               <FormHeader />
-              <RecordPrintContent record={viewRecord} showSignature={true} showManagerSignature={viewRecord.status === 'approved'} />
+              <RecordPrintContent record={viewRecord} />
             </div>
           )}
         </DialogContent>

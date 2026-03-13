@@ -5,16 +5,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import FormHeader from "@/components/FormHeader";
-import { save } from "@/lib/db";
+import { save } from "@/lib/supabaseDb";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Save, RotateCcw, Plus, Trash2, Eye } from "lucide-react";
+import { Save, RotateCcw, Plus, Trash2, Eye, Loader2 } from "lucide-react";
 
 interface BonusItem { name: string; qty: string; bonusPercent: string; compensation: string; }
 
 const ExtraBonusForm = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({ date: "", branch: "", recipient: "", subject: "", invoice: "", paymentType: "", rep: "" });
   const [items, setItems] = useState<BonusItem[]>([]);
   const [newItem, setNewItem] = useState<BonusItem>({ name: "", qty: "", bonusPercent: "", compensation: "" });
@@ -24,9 +25,20 @@ const ExtraBonusForm = () => {
   const addItem = () => { if (!newItem.name.trim()) return; setItems(prev => [...prev, { ...newItem }]); setNewItem({ name: "", qty: "", bonusPercent: "", compensation: "" }); };
   const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i));
 
-  const handleSave = () => {
-    save({ type: "extra-bonus", data: { ...formData, items, clientName: formData.subject }, userId: user?.id });
-    toast({ title: "تم الحفظ", description: "تم حفظ نموذج البونص الإضافي بنجاح" });
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    const result = await save({
+      type: "extra-bonus",
+      data: { ...formData, items, clientName: formData.subject },
+      userId: user.id,
+    });
+    setSaving(false);
+    if (result) {
+      toast({ title: "✅ تم الحفظ", description: "تم حفظ نموذج البونص الإضافي بنجاح" });
+    } else {
+      toast({ title: "خطأ", description: "فشل في حفظ النموذج", variant: "destructive" });
+    }
   };
 
   const handleReset = () => { setFormData({ date: "", branch: "", recipient: "", subject: "", invoice: "", paymentType: "", rep: "" }); setItems([]); };
@@ -70,18 +82,18 @@ const ExtraBonusForm = () => {
           </ul>
         )}
         <div className="flex flex-wrap gap-3 mt-6">
-          <Button onClick={handleSave} className="gap-2"><Save className="h-4 w-4" />حفظ</Button>
+          <Button onClick={handleSave} className="gap-2" disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            حفظ
+          </Button>
           <Button variant="outline" onClick={() => setShowPreview(true)} className="gap-2"><Eye className="h-4 w-4" />معاينة النموذج</Button>
           <Button variant="outline" onClick={handleReset} className="gap-2"><RotateCcw className="h-4 w-4" />مسح</Button>
         </div>
       </div>
 
-      {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>معاينة: نموذج بونص إضافي</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>معاينة: نموذج بونص إضافي</DialogTitle></DialogHeader>
           <div id="extra-bonus-print" className="print-page" style={{ border: "2px solid #000", borderRadius: "5px", padding: "16px" }}>
             <FormHeader />
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", fontWeight: "bold" }}>

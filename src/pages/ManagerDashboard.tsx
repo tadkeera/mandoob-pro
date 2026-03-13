@@ -1,71 +1,62 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getUsers, type User, saveManagerName, getManagerName } from "@/lib/auth";
-import { getAll } from "@/lib/db";
+import { getUsers, type User, saveManagerName } from "@/lib/supabaseAuth";
+import { getAll, type FormRecord } from "@/lib/supabaseDb";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Check, Save, User as UserIcon } from "lucide-react";
+import { Bell, Check, Save, User as UserIcon, Loader2 } from "lucide-react";
 
 const ManagerDashboard = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [representatives, setRepresentatives] = useState<User[]>([]);
   const [pendingCounts, setPendingCounts] = useState<Record<string, number>>({});
   const [managerName, setManagerName] = useState<string>("");
   const [savedManagerName, setSavedManagerName] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const loadData = () => {
-    const users = getUsers();
+  const loadData = async () => {
+    setLoading(true);
+    const users = await getUsers();
     const reps = users.filter(u => u.role === "representative");
-    const allRecords = getAll();
+    const allRecords = await getAll();
 
     const counts: Record<string, number> = {};
-    const oldestPending: Record<string, number> = {};
-
     reps.forEach(rep => {
-      const pendingRecords = allRecords.filter(r => r.userId === rep.id && r.status === 'pending-approval');
-      counts[rep.id] = pendingRecords.length;
-      if (pendingRecords.length > 0) {
-        const oldest = pendingRecords.reduce((min, r) => {
-          const t = new Date(r.submittedForApprovalAt || r.createdAt).getTime();
-          return t < min ? t : min;
-        }, Infinity);
-        oldestPending[rep.id] = oldest;
-      } else {
-        oldestPending[rep.id] = Infinity;
-      }
+      counts[rep.id] = allRecords.filter(r => r.userId === rep.id && r.status === "pending-approval").length;
     });
 
-    reps.sort((a, b) => (oldestPending[a.id] || Infinity) - (oldestPending[b.id] || Infinity));
+    reps.sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
     setRepresentatives(reps);
     setPendingCounts(counts);
-  };
-
-  const loadManagerName = () => {
-    if (user) {
-      const name = getManagerName(user.id) || user.displayName || "";
-      setSavedManagerName(name);
-      setManagerName(name);
-    }
+    setLoading(false);
   };
 
   useEffect(() => {
     loadData();
-    loadManagerName();
+    if (user) {
+      const name = user.managerName || user.displayName || "";
+      setSavedManagerName(name);
+      setManagerName(name);
+    }
   }, [user]);
 
-  const handleSaveName = () => {
+  const handleSaveName = async () => {
     if (!user) return;
     if (!managerName.trim()) {
       toast({ title: "خطأ", description: "يرجى إدخال اسم مدير الفرع", variant: "destructive" });
       return;
     }
-    saveManagerName(user.id, managerName.trim());
+    setSaving(true);
+    await saveManagerName(user.id, managerName.trim());
+    await refreshUser();
     setSavedManagerName(managerName.trim());
+    setSaving(false);
     toast({ title: "✅ تم الحفظ", description: `تم حفظ اسم مدير الفرع: ${managerName.trim()}` });
   };
 
@@ -96,8 +87,9 @@ const ManagerDashboard = () => {
               placeholder="أدخل اسم مدير الفرع..."
             />
           </div>
-          <Button onClick={handleSaveName} className="gap-2 shrink-0">
-            <Save className="h-4 w-4" /> حفظ الاسم
+          <Button onClick={handleSaveName} className="gap-2 shrink-0" disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            حفظ الاسم
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
@@ -105,35 +97,41 @@ const ManagerDashboard = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {representatives.map(rep => (
-          <div
-            key={rep.id}
-            onClick={() => navigate(`/manager-dashboard/rep/${rep.id}`)}
-            className="bg-card rounded-xl border shadow-sm hover:shadow-md transition-all p-6 cursor-pointer hover:-translate-y-1 relative"
-          >
-            {(pendingCounts[rep.id] || 0) > 0 && (
-              <div className="absolute -top-2 -left-2 bg-destructive text-destructive-foreground rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold shadow-md">
-                {pendingCounts[rep.id]}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {representatives.map(rep => (
+            <div
+              key={rep.id}
+              onClick={() => navigate(`/manager-dashboard/rep/${rep.id}`)}
+              className="bg-card rounded-xl border shadow-sm hover:shadow-md transition-all p-6 cursor-pointer hover:-translate-y-1 relative"
+            >
+              {(pendingCounts[rep.id] || 0) > 0 && (
+                <div className="absolute -top-2 -left-2 bg-destructive text-destructive-foreground rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold shadow-md">
+                  {pendingCounts[rep.id]}
+                </div>
+              )}
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="bg-primary/10 rounded-full p-4">
+                  <Bell className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-bold text-card-foreground">{rep.displayName}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {pendingCounts[rep.id] || 0} نموذج بانتظار الاعتماد
+                </p>
               </div>
-            )}
-            <div className="flex flex-col items-center text-center gap-3">
-              <div className="bg-primary/10 rounded-full p-4">
-                <Bell className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="text-lg font-bold text-card-foreground">{rep.displayName}</h3>
-              <p className="text-sm text-muted-foreground">
-                {pendingCounts[rep.id] || 0} نموذج بانتظار الاعتماد
-              </p>
             </div>
-          </div>
-        ))}
-        {representatives.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            لا يوجد مندوبين مسجلين. يرجى إضافة مندوبين من صفحة إدارة المستخدمين.
-          </div>
-        )}
-      </div>
+          ))}
+          {representatives.length === 0 && (
+            <div className="col-span-full text-center py-12 text-muted-foreground">
+              لا يوجد مندوبين مسجلين. يرجى إضافة مندوبين من صفحة إدارة المستخدمين.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
