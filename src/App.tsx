@@ -12,27 +12,31 @@ import ExtraBonusForm from "./pages/ExtraBonusForm";
 import Reports from "./pages/Reports";
 import ReportsIndex from "./pages/ReportsIndex";
 import DataManagement from "./pages/DataManagement";
-
 import LoginPage from "./pages/LoginPage";
 import UserManagement from "./pages/UserManagement";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import RepRecordsPage from "./pages/RepRecordsPage";
 import AdminReports from "./pages/AdminReports";
 import NotFound from "./pages/NotFound";
-import { useAutoBackup } from "@/hooks/useAutoBackup";
+import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  const { user } = useAuth();
-  useAutoBackup();
+  const { user, loading } = useAuth();
 
-  if (!user) {
-    return <LoginPage />;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
   }
 
-  const isRep = user.role === 'representative';
-  const isManager = user.role === 'branch-manager';
+  if (!user) return <LoginPage />;
+
+  const isRep = user.role === "representative";
+  const isManager = user.role === "branch-manager";
 
   if (isManager) {
     return (
@@ -87,20 +91,18 @@ const AppContent = () => {
   );
 };
 
-const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <AppContent />
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-};
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;
