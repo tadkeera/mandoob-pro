@@ -27,24 +27,26 @@ function mapProfile(p: ProfileRow): User {
   };
 }
 
-export async function signUp(username: string, password: string, displayName: string, role: UserRole = "representative"): Promise<{ user: User | null; error: string | null }> {
-  // Use username@mandoob.app as email internally
-  const email = `${username.replace(/\s+/g, "_")}@mandoob.app`;
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { username, display_name: displayName, role },
+export async function signUp(username: string, password: string, displayName: string, role: UserRole = "representative", branchId?: string): Promise<{ user: User | null; error: string | null }> {
+  // Use edge function to create user (admin-only, doesn't change current session)
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const response = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     },
+    body: JSON.stringify({ username, password, displayName, role, branchId }),
   });
-  if (error) return { user: null, error: error.message };
-  if (!data.user) return { user: null, error: "فشل إنشاء الحساب" };
 
-  // Grant role in user_roles table
-  await supabase.from("user_roles").insert({ user_id: data.user.id, role });
+  const result = await response.json();
+  if (!response.ok || result.error) return { user: null, error: result.error || "فشل إنشاء الحساب" };
 
-  const profile = await getProfileById(data.user.id);
-  return { user: profile, error: null };
+  return { user: result.user ? mapProfile(result.user) : null, error: null };
 }
 
 export async function login(username: string, password: string): Promise<User | null> {
