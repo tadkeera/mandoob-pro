@@ -27,24 +27,26 @@ function mapProfile(p: ProfileRow): User {
   };
 }
 
-export async function signUp(username: string, password: string, displayName: string, role: UserRole = "representative"): Promise<{ user: User | null; error: string | null }> {
-  // Use username@mandoob.app as email internally
-  const email = `${username.replace(/\s+/g, "_")}@mandoob.app`;
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { username, display_name: displayName, role },
+export async function signUp(username: string, password: string, displayName: string, role: UserRole = "representative", branchId?: string): Promise<{ user: User | null; error: string | null }> {
+  // Use edge function to create user (admin-only, doesn't change current session)
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const response = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     },
+    body: JSON.stringify({ username, password, displayName, role, branchId }),
   });
-  if (error) return { user: null, error: error.message };
-  if (!data.user) return { user: null, error: "فشل إنشاء الحساب" };
 
-  // Grant role in user_roles table
-  await supabase.from("user_roles").insert({ user_id: data.user.id, role });
+  const result = await response.json();
+  if (!response.ok || result.error) return { user: null, error: result.error || "فشل إنشاء الحساب" };
 
-  const profile = await getProfileById(data.user.id);
-  return { user: profile, error: null };
+  return { user: result.user ? mapProfile(result.user) : null, error: null };
 }
 
 export async function login(username: string, password: string): Promise<User | null> {
@@ -77,9 +79,23 @@ export async function getUsers(): Promise<User[]> {
   return (data || []).map(mapProfile);
 }
 
-export async function addUser(user: { username: string; password: string; displayName: string; role: UserRole }): Promise<User | null> {
-  const result = await signUp(user.username, user.password, user.displayName, user.role);
-  return result.user;
+export async function addUser(user: { username: string; password: string; displayName: string; role: UserRole; branchId?: string }): Promise<{ user: User | null; error: string | null }> {
+  return await signUp(user.username, user.password, user.displayName, user.role, user.branchId);
+}
+
+export async function deleteUserAdmin(id: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    },
+    body: JSON.stringify({ userId: id }),
+  });
 }
 
 export async function updateUser(id: string, updates: Partial<User & { password?: string }>): Promise<void> {
@@ -88,6 +104,7 @@ export async function updateUser(id: string, updates: Partial<User & { password?
   if (updates.username) profileUpdate.username = updates.username;
   if (updates.role) profileUpdate.role = updates.role;
   if (updates.managerName !== undefined) profileUpdate.manager_name = updates.managerName;
+  if (updates.branchId !== undefined) profileUpdate.branch_id = updates.branchId || null;
 
   if (Object.keys(profileUpdate).length > 0) {
     const { error } = await supabase.from("profiles").update(profileUpdate).eq("id", id);

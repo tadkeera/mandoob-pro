@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getUsers, addUser, updateUser, deleteUser, type User, type UserRole } from "@/lib/supabaseAuth";
+import { getUsers, addUser, updateUser, deleteUserAdmin, type User, type UserRole } from "@/lib/supabaseAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Pencil, Users, Shield, Loader2 } from "lucide-react";
+import { Trash2, Plus, Pencil, Users, Shield, Loader2, Building2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const roleLabels: Record<UserRole, string> = {
@@ -14,13 +14,31 @@ const roleLabels: Record<UserRole, string> = {
   representative: "مندوب",
 };
 
+const BRANCHES = [
+  { value: "european", label: "الفرع الأوروبي" },
+  { value: "arabic", label: "الفرع العربي" },
+];
+
+const getBranchLabel = (branchId?: string) => {
+  if (!branchId) return "";
+  return BRANCHES.find(b => b.value === branchId)?.label || branchId;
+};
+
+const rolesWithBranch: UserRole[] = ["representative", "branch-manager"];
+
 const UserManagement = () => {
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
-  const [form, setForm] = useState({ username: "", password: "", displayName: "", role: "representative" as UserRole });
+  const [form, setForm] = useState({
+    username: "",
+    password: "",
+    displayName: "",
+    role: "representative" as UserRole,
+    branchId: "",
+  });
 
   const reload = async () => {
     setLoading(true);
@@ -36,41 +54,52 @@ const UserManagement = () => {
       toast({ title: "خطأ", description: "يجب ملء جميع الحقول", variant: "destructive" });
       return;
     }
+    if (rolesWithBranch.includes(form.role) && !form.branchId) {
+      toast({ title: "خطأ", description: "يجب تحديد الفرع", variant: "destructive" });
+      return;
+    }
     setLoading(true);
-    const newUser = await addUser({
+    const result = await addUser({
       username: form.username,
       password: form.password,
       displayName: form.displayName || form.username,
       role: form.role,
+      branchId: rolesWithBranch.includes(form.role) ? form.branchId : undefined,
     });
     setLoading(false);
-    if (newUser) {
-      toast({ title: "تم الإضافة", description: "تم إضافة المستخدم بنجاح" });
-      setForm({ username: "", password: "", displayName: "", role: "representative" });
+    if (result.user) {
+      toast({ title: "✅ تم الإضافة", description: `تم إضافة المستخدم "${form.displayName || form.username}" بنجاح` });
+      setForm({ username: "", password: "", displayName: "", role: "representative", branchId: "" });
       setShowAdd(false);
       reload();
     } else {
-      toast({ title: "خطأ", description: "فشل في إضافة المستخدم. قد يكون اسم المستخدم مستخدماً بالفعل.", variant: "destructive" });
+      toast({ title: "خطأ", description: result.error || "فشل في إضافة المستخدم", variant: "destructive" });
     }
   };
 
   const handleUpdate = async () => {
     if (!editUser) return;
+    if (rolesWithBranch.includes(form.role) && !form.branchId) {
+      toast({ title: "خطأ", description: "يجب تحديد الفرع", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     await updateUser(editUser.id, {
       username: form.username,
       displayName: form.displayName || form.username,
       role: form.role,
+      branchId: rolesWithBranch.includes(form.role) ? form.branchId : undefined,
     });
     setLoading(false);
-    toast({ title: "تم التعديل", description: "تم تعديل المستخدم بنجاح" });
+    toast({ title: "✅ تم التعديل", description: "تم تعديل المستخدم بنجاح" });
     setEditUser(null);
     reload();
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا المستخدم؟")) return;
     setLoading(true);
-    await deleteUser(id);
+    await deleteUserAdmin(id);
     setLoading(false);
     toast({ title: "تم الحذف", description: "تم حذف المستخدم" });
     reload();
@@ -78,8 +107,16 @@ const UserManagement = () => {
 
   const startEdit = (user: User) => {
     setEditUser(user);
-    setForm({ username: user.username, password: "", displayName: user.displayName, role: user.role });
+    setForm({
+      username: user.username,
+      password: "",
+      displayName: user.displayName,
+      role: user.role,
+      branchId: user.branchId || "",
+    });
   };
+
+  const showBranchField = rolesWithBranch.includes(form.role);
 
   return (
     <div className="container mx-auto px-4 py-6 animate-fade-in" dir="rtl">
@@ -87,7 +124,13 @@ const UserManagement = () => {
         <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
           <Users className="h-6 w-6" /> إدارة المستخدمين
         </h1>
-        <Button onClick={() => { setShowAdd(true); setForm({ username: "", password: "", displayName: "", role: "representative" }); }} className="gap-2">
+        <Button
+          onClick={() => {
+            setShowAdd(true);
+            setForm({ username: "", password: "", displayName: "", role: "representative", branchId: "" });
+          }}
+          className="gap-2"
+        >
           <Plus className="h-4 w-4" /> إضافة مستخدم
         </Button>
       </div>
@@ -107,8 +150,17 @@ const UserManagement = () => {
               </div>
               <div>
                 <div className="font-bold text-card-foreground">{user.displayName}</div>
-                <div className="text-sm text-muted-foreground">
-                  {roleLabels[user.role]} • @{user.username}
+                <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
+                  <span>{roleLabels[user.role]}</span>
+                  <span>•</span>
+                  <span>@{user.username}</span>
+                  {user.branchId && (
+                    <>
+                      <span>•</span>
+                      <Building2 className="h-3 w-3" />
+                      <span>{getBranchLabel(user.branchId)}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -134,12 +186,12 @@ const UserManagement = () => {
         <DialogContent className="max-w-md" dir="rtl">
           <DialogHeader><DialogTitle>إضافة مستخدم جديد</DialogTitle></DialogHeader>
           <div className="grid gap-4">
-            <div><Label>اسم المستخدم</Label><Input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} /></div>
+            <div><Label>اسم المستخدم</Label><Input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="مثال: ahmed_ali" /></div>
             <div><Label>كلمة المرور</Label><Input type="password" dir="ltr" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
-            <div><Label>الاسم الظاهر</Label><Input value={form.displayName} onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} /></div>
+            <div><Label>الاسم الظاهر</Label><Input value={form.displayName} onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} placeholder="مثال: أحمد علي" /></div>
             <div>
               <Label>الصلاحية</Label>
-              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as UserRole }))}>
+              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as UserRole, branchId: "" }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">مدير النظام</SelectItem>
@@ -148,6 +200,19 @@ const UserManagement = () => {
                 </SelectContent>
               </Select>
             </div>
+            {showBranchField && (
+              <div>
+                <Label className="flex items-center gap-1"><Building2 className="h-4 w-4" /> الفرع</Label>
+                <Select value={form.branchId} onValueChange={v => setForm(f => ({ ...f, branchId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="اختر الفرع..." /></SelectTrigger>
+                  <SelectContent>
+                    {BRANCHES.map(b => (
+                      <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Button onClick={handleAdd} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : null}
               إضافة
@@ -165,7 +230,7 @@ const UserManagement = () => {
             <div><Label>الاسم الظاهر</Label><Input value={form.displayName} onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} /></div>
             <div>
               <Label>الصلاحية</Label>
-              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as UserRole }))}>
+              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as UserRole, branchId: "" }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">مدير النظام</SelectItem>
@@ -174,6 +239,19 @@ const UserManagement = () => {
                 </SelectContent>
               </Select>
             </div>
+            {showBranchField && (
+              <div>
+                <Label className="flex items-center gap-1"><Building2 className="h-4 w-4" /> الفرع</Label>
+                <Select value={form.branchId} onValueChange={v => setForm(f => ({ ...f, branchId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="اختر الفرع..." /></SelectTrigger>
+                  <SelectContent>
+                    {BRANCHES.map(b => (
+                      <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Button onClick={handleUpdate} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : null}
               حفظ التعديلات
