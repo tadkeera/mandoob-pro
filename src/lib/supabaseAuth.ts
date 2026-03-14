@@ -79,9 +79,23 @@ export async function getUsers(): Promise<User[]> {
   return (data || []).map(mapProfile);
 }
 
-export async function addUser(user: { username: string; password: string; displayName: string; role: UserRole }): Promise<User | null> {
-  const result = await signUp(user.username, user.password, user.displayName, user.role);
-  return result.user;
+export async function addUser(user: { username: string; password: string; displayName: string; role: UserRole; branchId?: string }): Promise<{ user: User | null; error: string | null }> {
+  return await signUp(user.username, user.password, user.displayName, user.role, user.branchId);
+}
+
+export async function deleteUserAdmin(id: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    },
+    body: JSON.stringify({ userId: id }),
+  });
 }
 
 export async function updateUser(id: string, updates: Partial<User & { password?: string }>): Promise<void> {
