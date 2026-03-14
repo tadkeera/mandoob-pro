@@ -36,7 +36,7 @@ const Navbar = () => {
     : allNavItems.filter(item => {
         if (!user) return true;
         if (item.hideForRoles && item.hideForRoles.includes(user.role)) return false;
-        if (item.path === "/manager-dashboard" && user.role !== "branch-manager" && user.role !== "admin") return false;
+        if (item.path === "/manager-dashboard") return false;
         return true;
       });
 
