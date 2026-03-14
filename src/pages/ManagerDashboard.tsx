@@ -23,7 +23,12 @@ const ManagerDashboard = () => {
   const loadData = async () => {
     setLoading(true);
     const users = await getUsers();
-    const reps = users.filter(u => u.role === "representative");
+    // Filter reps to only those in the same branch as the manager
+    const managerBranch = user?.branchId;
+    const reps = users.filter(u =>
+      u.role === "representative" &&
+      (!managerBranch || u.branchId === managerBranch)
+    );
     const allRecords = await getAll();
 
     const counts: Record<string, number> = {};

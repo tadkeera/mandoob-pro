@@ -104,6 +104,7 @@ export async function updateUser(id: string, updates: Partial<User & { password?
   if (updates.username) profileUpdate.username = updates.username;
   if (updates.role) profileUpdate.role = updates.role;
   if (updates.managerName !== undefined) profileUpdate.manager_name = updates.managerName;
+  if (updates.branchId !== undefined) profileUpdate.branch_id = updates.branchId || null;
 
   if (Object.keys(profileUpdate).length > 0) {
     const { error } = await supabase.from("profiles").update(profileUpdate).eq("id", id);
